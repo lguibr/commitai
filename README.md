@@ -66,16 +66,22 @@ Comai will generate a commit message based on your staged changes and display it
 git commit -m "<generated commit message>"
 ```
 
-Alternatively, you can use the -m or --commit flag to automatically create the commit with the generated message:
+Alternatively, you can use the -c or --commit flag to automatically create the commit with the generated message:
 
 ```bash
-comai -m
+comai -c
 ```
 
 If you want to use a specific template for your commit messages, you can set the **TEMPLATE_COMMIT** environment variable in your shell configuration file or pass it as a command-line argument using the -t or --template flag:
 
 ```bash
 comai --template "My custom template: {message}"
+```
+
+To use a different engine model, you can use the -m or --model flag, with the default value set to "gpt-4":
+
+```bash
+comai --model "gpt-3"
 ```
 
 ## Contributing

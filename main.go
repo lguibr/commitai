@@ -65,7 +65,7 @@ func stageAllChanges() error {
 	return cmd.Run()
 }
 
-func prepareRequestPayload(diff, template string) ([]byte, error) {
+func prepareRequestPayload(diff, template, model string) ([]byte, error) {
 	systemMessage := "You are a helpful git commit assistant, you will receive a git diff and you will generate a commit message."
 
 	if template != "" {
@@ -73,7 +73,7 @@ func prepareRequestPayload(diff, template string) ([]byte, error) {
 	}
 
 	payload := map[string]interface{}{
-		"model": "gpt-4",
+		"model": model,
 		"messages": []map[string]string{
 			{
 				"role":    "system",
@@ -88,7 +88,6 @@ func prepareRequestPayload(diff, template string) ([]byte, error) {
 
 	return json.Marshal(payload)
 }
-
 func createAPIRequest(apiKey string, payloadBytes []byte) (*http.Request, error) {
 	req, err := http.NewRequest("POST", OpenAIAPIURL, bytes.NewReader(payloadBytes))
 	if err != nil {
@@ -135,7 +134,7 @@ func main() {
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "commit",
-				Aliases: []string{"m"},
+				Aliases: []string{"c"},
 				Usage:   "Commit the changes with the generated message",
 			},
 			&cli.StringFlag{
@@ -148,6 +147,12 @@ func main() {
 				Name:    "add",
 				Aliases: []string{"a"},
 				Usage:   "Stage all changes before generating the commit message",
+			},
+			&cli.StringFlag{
+				Name:    "model",
+				Aliases: []string{"m"},
+				Value:   "gpt-4",
+				Usage:   "Set the engine model to be used",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -190,7 +195,8 @@ func main() {
 			formattedDiff := formatDiffWithRepoAndBranchInfo(repoName, branchName, diff)
 
 			template := c.String("template")
-			payloadBytes, err := prepareRequestPayload(formattedDiff, template)
+			model := c.String("model")
+			payloadBytes, err := prepareRequestPayload(formattedDiff, template, model)
 			if err != nil {
 				fmt.Println("Error: Failed to prepare request payload")
 				os.Exit(1)
