@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/urfave/cli/v2"
@@ -23,10 +24,31 @@ var (
 )
 
 func getStagedDiff() (string, error) {
+	// Get repository name
+	cmdRepo := exec.Command("git", "rev-parse", "--show-toplevel")
+	var outRepo bytes.Buffer
+	cmdRepo.Stdout = &outRepo
+	err := cmdRepo.Run()
+	if err != nil {
+		return "", err
+	}
+	repoName := filepath.Base(strings.TrimSpace(outRepo.String()))
+
+	// Get current branch name
+	cmdBranch := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	var outBranch bytes.Buffer
+	cmdBranch.Stdout = &outBranch
+	err = cmdBranch.Run()
+	if err != nil {
+		return "", err
+	}
+	branchName := strings.TrimSpace(outBranch.String())
+
+	// Get diff
 	cmd := exec.Command("git", "diff", "--staged")
 	var out bytes.Buffer
 	cmd.Stdout = &out
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		return "", err
 	}
@@ -36,7 +58,9 @@ func getStagedDiff() (string, error) {
 		return "", nil
 	}
 
-	return diff, nil
+	// Add repository name and branch information at the beginning of the diff
+	formattedDiff := fmt.Sprintf("%s/%s\n\n%s", repoName, branchName, diff)
+	return formattedDiff, nil
 }
 
 func generateCommitMessage(apiKey string, diff string, template string) (string, error) {
