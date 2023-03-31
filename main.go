@@ -23,57 +23,49 @@ var (
 	TEMPLATE_COMMIT = os.Getenv("TEMPLATE_COMMIT")
 )
 
-func getStagedDiff() (string, error) {
-	// Get repository name
-	cmdRepo := exec.Command("git", "rev-parse", "--show-toplevel")
-	var outRepo bytes.Buffer
-	cmdRepo.Stdout = &outRepo
-	err := cmdRepo.Run()
+func getRepositoryName() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
 	if err != nil {
 		return "", err
 	}
-	repoName := filepath.Base(strings.TrimSpace(outRepo.String()))
+	return filepath.Base(strings.TrimSpace(out.String())), nil
+}
 
-	// Get current branch name
-	cmdBranch := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-	var outBranch bytes.Buffer
-	cmdBranch.Stdout = &outBranch
-	err = cmdBranch.Run()
+func getCurrentBranchName() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
 	if err != nil {
 		return "", err
 	}
-	branchName := strings.TrimSpace(outBranch.String())
+	return strings.TrimSpace(out.String()), nil
+}
 
-	// Get diff
+func getStagedChangesDiff() (string, error) {
 	cmd := exec.Command("git", "diff", "--staged")
 	var out bytes.Buffer
 	cmd.Stdout = &out
-	err = cmd.Run()
+	err := cmd.Run()
 	if err != nil {
 		return "", err
 	}
+	return out.String(), nil
+}
 
-	diff := out.String()
-	if strings.TrimSpace(diff) == "" {
-		return "", nil
-	}
-
-	// Add repository name and branch information at the beginning of the diff
-	formattedDiff := fmt.Sprintf("%s/%s\n\n%s", repoName, branchName, diff)
-	return formattedDiff, nil
+func formatDiffWithRepoAndBranchInfo(repoName, branchName, diff string) string {
+	return fmt.Sprintf("%s/%s\n\n%s", repoName, branchName, diff)
 }
 
 func stageAllChanges() error {
 	cmd := exec.Command("git", "add", "--all")
-	err := cmd.Run()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return cmd.Run()
 }
 
-func generateCommitMessage(apiKey string, diff string, template string) (string, error) {
+func prepareRequestPayload(diff, template string) ([]byte, error) {
 	systemMessage := "You are a helpful git commit assistant, you will receive a git diff and you will generate a commit message."
 
 	if template != "" {
@@ -94,36 +86,32 @@ func generateCommitMessage(apiKey string, diff string, template string) (string,
 		},
 	}
 
-	payloadBytes, err := json.Marshal(payload)
-	if err != nil {
-		return "", err
-	}
+	return json.Marshal(payload)
+}
 
+func createAPIRequest(apiKey string, payloadBytes []byte) (*http.Request, error) {
 	req, err := http.NewRequest("POST", OpenAIAPIURL, bytes.NewReader(payloadBytes))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
+	return req, nil
+}
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("error: failed to generate commit message using open_ai api")
-	}
+func sendAPIRequest(req *http.Request) (*http.Response, error) {
+	return http.DefaultClient.Do(req)
+}
 
-	responseBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
+func readResponseBody(resp *http.Response) ([]byte, error) {
+	return io.ReadAll(resp.Body)
+}
 
+func parseResponse(responseBody []byte) (string, error) {
 	var responseData map[string]interface{}
-	err = json.Unmarshal(responseBody, &responseData)
+	err := json.Unmarshal(responseBody, &responseData)
 	if err != nil {
 		return "", err
 	}
@@ -137,12 +125,7 @@ func generateCommitMessage(apiKey string, diff string, template string) (string,
 
 func createCommit(commitMessage string) error {
 	cmd := exec.Command("git", "commit", "-m", commitMessage)
-	err := cmd.Run()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return cmd.Run()
 }
 
 func main() {
@@ -181,7 +164,7 @@ func main() {
 				}
 			}
 
-			diff, err := getStagedDiff()
+			diff, err := getStagedChangesDiff()
 			if err != nil {
 				fmt.Println("Error: Failed to get staged diff")
 				os.Exit(1)
@@ -192,10 +175,54 @@ func main() {
 				os.Exit(0)
 			}
 
-			template := c.String("template")
-			commitMessage, err := generateCommitMessage(OpenAI_API_KEY, diff, template)
+			repoName, err := getRepositoryName()
 			if err != nil {
-				fmt.Println(err)
+				fmt.Println("Error: Failed to get repository name")
+				os.Exit(1)
+			}
+
+			branchName, err := getCurrentBranchName()
+			if err != nil {
+				fmt.Println("Error: Failed to get current branch name")
+				os.Exit(1)
+			}
+
+			formattedDiff := formatDiffWithRepoAndBranchInfo(repoName, branchName, diff)
+
+			template := c.String("template")
+			payloadBytes, err := prepareRequestPayload(formattedDiff, template)
+			if err != nil {
+				fmt.Println("Error: Failed to prepare request payload")
+				os.Exit(1)
+			}
+
+			req, err := createAPIRequest(OpenAI_API_KEY, payloadBytes)
+			if err != nil {
+				fmt.Println("Error: Failed to create API request")
+				os.Exit(1)
+			}
+
+			resp, err := sendAPIRequest(req)
+			if err != nil {
+				fmt.Println("Error: Failed to send API request")
+				os.Exit(1)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				fmt.Println("Error: Failed to generate commit message using open_ai api")
+				os.Exit(1)
+			}
+
+			responseBody, err := readResponseBody(resp)
+			if err != nil {
+				fmt.Println("Error: Failed to read response body")
+				os.Exit(1)
+			}
+
+			commitMessage, err := parseResponse(responseBody)
+			if err != nil {
+				fmt.Println("Error: Failed to parse response")
 				os.Exit(1)
 			}
 
@@ -205,7 +232,7 @@ func main() {
 					fmt.Println("Error: Failed to create commit")
 					os.Exit(1)
 				}
-				fmt.Printf("Commited message: \n\n %s\n", commitMessage)
+				fmt.Printf("Committed message: \n\n %s\n", commitMessage)
 			} else {
 				fmt.Printf("Generated commit message: \n\n %s\n", commitMessage)
 			}
