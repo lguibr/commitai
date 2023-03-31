@@ -1,6 +1,6 @@
 # Comai - Commit Message AI
 
-Comai is a command-line tool that helps you generate informative and relevant commit messages for your Git repositories using GPT-4 by OpenAI. It analyzes your staged changes and creates a commit message based on the diff, saving you time and effort while maintaining meaningful commit history.
+Comai is a command-line tool that helps you generate informative and relevant commit messages for your Git repositories using GPT by OpenAI. It analyzes your staged changes and creates a commit message based on the diff, saving you time and effort while maintaining meaningful commit history.
 
 ![ScreenShoot](comai.gif)
 
