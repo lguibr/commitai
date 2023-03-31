@@ -54,6 +54,12 @@ After staging your changes using git add, run the comai command:
 comai
 ```
 
+To stage all changes before generating the commit message, use the -a or --add flag:
+
+```bash
+comai -a
+```
+
 Comai will generate a commit message based on your staged changes and display it. If you are satisfied with the generated message, run the following command to create the commit:
 
 ```bash
