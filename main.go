@@ -63,6 +63,16 @@ func getStagedDiff() (string, error) {
 	return formattedDiff, nil
 }
 
+func stageAllChanges() error {
+	cmd := exec.Command("git", "add", "--all")
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func generateCommitMessage(apiKey string, diff string, template string) (string, error) {
 	systemMessage := "You are a helpful git commit assistant, you will receive a git diff and you will generate a commit message."
 
@@ -104,7 +114,7 @@ func generateCommitMessage(apiKey string, diff string, template string) (string,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("Error: Failed to generate commit message using OpenAI API")
+		return "", fmt.Errorf("error: failed to generate commit message using open_ai api")
 	}
 
 	responseBody, err := io.ReadAll(resp.Body)
@@ -151,11 +161,24 @@ func main() {
 				Value:   TEMPLATE_COMMIT,
 				Usage:   "Specify a commit message template",
 			},
+			&cli.BoolFlag{
+				Name:    "add",
+				Aliases: []string{"a"},
+				Usage:   "Stage all changes before generating the commit message",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			if OpenAI_API_KEY == "" {
 				fmt.Println("Error: OPENAI_API_KEY environment variable not set")
 				os.Exit(1)
+			}
+
+			if c.Bool("add") {
+				err := stageAllChanges()
+				if err != nil {
+					fmt.Println("Error: Failed to stage all changes")
+					os.Exit(1)
+				}
 			}
 
 			diff, err := getStagedDiff()
