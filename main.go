@@ -205,7 +205,7 @@ func main() {
 					fmt.Println("Error: Failed to create commit")
 					os.Exit(1)
 				}
-				fmt.Printf("Generated commit message: \n\n %s\n", commitMessage)
+				fmt.Printf("Commited message: \n\n %s\n", commitMessage)
 			} else {
 				fmt.Printf("Generated commit message: \n\n %s\n", commitMessage)
 			}
