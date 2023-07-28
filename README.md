@@ -1,6 +1,6 @@
 # Comai - Commit Message AI
 
-Comai is a command-line tool that helps you generate informative and relevant commit messages for your Git repositories using GPT by OpenAI. It analyzes your staged changes and creates a commit message based on the diff, saving you time and effort while maintaining meaningful commit history.
+Comai is a command-line tool that helps you generate informative and relevant commit messages for your Git repositories using GPT-4 by OpenAI. It analyzes your staged changes, combines it with a high-level explanation provided by you, and creates a commit message based on this information. This not only saves you time and effort, but also ensures a consistent and meaningful commit history.
 
 ![ScreenShoot](comai.gif)
 
@@ -50,16 +50,16 @@ source ~/.zshrc # For Zsh
 
 ## Usage
 
-After staging your changes using git add, run the comai command:
+After staging your changes using git add, run the comai command with a positional argument being a high-level explanation of the commit:
 
 ```bash
-comai
+comai "This is a high level explanation of my commit"
 ```
 
 To stage all changes before generating the commit message, use the -a or --add flag:
 
 ```bash
-comai -a
+comai -a "This is a high level explanation of my commit"
 ```
 
 Comai will generate a commit message based on your staged changes and display it. If you are satisfied with the generated message, run the following command to create the commit:
@@ -71,19 +71,19 @@ git commit -m "<generated commit message>"
 Alternatively, you can use the -c or --commit flag to automatically create the commit with the generated message:
 
 ```bash
-comai -c
+comai -c "This is a high level explanation of my commit"
 ```
 
 If you want to use a specific template for your commit messages, you can set the **TEMPLATE_COMMIT** environment variable in your shell configuration file or pass it as a command-line argument using the -t or --template flag:
 
 ```bash
-comai --template "My custom template: {message}"
+comai --template "My custom template: {message}" "This is a high level explanation of my commit"
 ```
 
 To use a different engine model, you can use the -m or --model flag, with the default value set to "gpt-4":
 
 ```bash
-comai --model "gpt-3"
+comai --model "gpt-3" "This is a high level explanation of my commit"
 ```
 
 ## Contributing

@@ -65,29 +65,40 @@ func stageAllChanges() error {
 	return cmd.Run()
 }
 
-func prepareRequestPayload(diff, template, model string) ([]byte, error) {
-	systemMessage := "You are a helpful git commit assistant, you will receive a git diff and you will generate a commit message."
+func prepareRequestPayload(diff, template, model, explanation string) ([]byte, error) {
+	systemMessage := "You are a helpful git commit assistant, you will receive a git diff and you will generate a commit message, try be meaningful and avoid generic messages."
 
 	if template != "" {
 		systemMessage += " This message should follow the following template: " + template
 	}
 
-	payload := map[string]interface{}{
-		"model": model,
-		"messages": []map[string]string{
-			{
-				"role":    "system",
-				"content": systemMessage,
-			},
-			{
-				"role":    "user",
-				"content": diff,
-			},
+	messages := []map[string]string{
+		{
+			"role":    "system",
+			"content": systemMessage,
 		},
+	}
+
+	if explanation != "" {
+		messages = append(messages, map[string]string{
+			"role":    "user",
+			"content": "Here is a high level explanation of the commit: " + explanation,
+		})
+	}
+
+	messages = append(messages, map[string]string{
+		"role":    "user",
+		"content": diff,
+	})
+
+	payload := map[string]interface{}{
+		"model":    model,
+		"messages": messages,
 	}
 
 	return json.Marshal(payload)
 }
+
 func createAPIRequest(apiKey string, payloadBytes []byte) (*http.Request, error) {
 	req, err := http.NewRequest("POST", OpenAIAPIURL, bytes.NewReader(payloadBytes))
 	if err != nil {
@@ -108,18 +119,22 @@ func readResponseBody(resp *http.Response) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-func parseResponse(responseBody []byte) (string, error) {
+func parseResponse(responseBody []byte) (string, string, error) {
 	var responseData map[string]interface{}
 	err := json.Unmarshal(responseBody, &responseData)
 	if err != nil {
-		return "", err
+		return "", "", err
+	}
+
+	if responseData["error"] != nil {
+		return "", responseData["error"].(map[string]interface{})["message"].(string), nil
 	}
 
 	choices := responseData["choices"].([]interface{})
 	choice := choices[0].(map[string]interface{})
 	message := choice["message"].(map[string]interface{})
 
-	return message["content"].(string), nil
+	return message["content"].(string), "", nil
 }
 
 func createCommit(commitMessage string) error {
@@ -132,6 +147,11 @@ func main() {
 		Name:  "git-commit-helper",
 		Usage: "Generate git commit messages using GPT-4",
 		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "explanation",
+				Aliases: []string{"e"},
+				Usage:   "Add a high level explanation of the commit",
+			},
 			&cli.BoolFlag{
 				Name:    "commit",
 				Aliases: []string{"c"},
@@ -196,7 +216,14 @@ func main() {
 
 			template := c.String("template")
 			model := c.String("model")
-			payloadBytes, err := prepareRequestPayload(formattedDiff, template, model)
+			explanation := c.Args().Get(0)
+
+			if explanation == "" {
+				explanation = c.String("explanation")
+			}
+
+			payloadBytes, err := prepareRequestPayload(formattedDiff, template, model, explanation)
+
 			if err != nil {
 				fmt.Println("Error: Failed to prepare request payload")
 				os.Exit(1)
@@ -226,9 +253,14 @@ func main() {
 				os.Exit(1)
 			}
 
-			commitMessage, err := parseResponse(responseBody)
+			commitMessage, apiError, err := parseResponse(responseBody)
 			if err != nil {
-				fmt.Println("Error: Failed to parse response")
+				fmt.Printf("Error: Failed to parse response: %v\n", err)
+				os.Exit(1)
+			}
+
+			if apiError != "" {
+				fmt.Printf("Error from OpenAI API: %s\n", apiError)
 				os.Exit(1)
 			}
 
