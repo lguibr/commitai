@@ -1,6 +1,6 @@
 # Comai - Commit Message AI
 
-Comai is a command-line tool that helps you generate informative and relevant commit messages for your Git repositories using GPT-4 by OpenAI. It analyzes your staged changes, combines it with a high-level explanation provided by you, and creates a commit message based on this information. This not only saves you time and effort, but also ensures a consistent and meaningful commit history.
+Comai is a command-line tool that helps you generate informative and relevant commit messages for your Git repositories using GPT-4 by OpenAI. It analyzes your staged changes, combines it with a high-level explanation provided by you, and creates a commit message based on this information. Additionally, it supports custom commit message templates and a back command to reset to previous commits. This not only saves you time and effort but also ensures a consistent and meaningful commit history.
 
 ![ScreenShoot](comai.gif)
 
@@ -15,6 +15,7 @@ Comai is a command-line tool that helps you generate informative and relevant co
 
 ```bash
 git clone https://github.com/yourusername/comai.git
+
 ```
 
 2. Change to the project directory:
@@ -33,57 +34,46 @@ The install.sh script will build and install the comai binary to /usr/local/bin.
 
 # Configuration
 
-Before using Comai, you need to set the **OPENAI_API_KEY** environment variable to your OpenAI API key. You can set this variable in your shell's configuration file (e.g., .bashrc for Bash or .zshrc for Zsh).
+## Environment Variables
 
-For example, add the following line to your shell configuration file, replacing your_api_key with your actual API key:
+Before using Comai, you need to set the **OPENAI_API_KEY** and optionally the **TEMPLATE_COMMIT** environment variables. The TEMPLATE_COMMIT variable allows you to define a global template for your commit messages.
 
 ```bash
 export OPENAI_API_KEY="your_api_key"
+export TEMPLATE_COMMIT="My global custom template: {message}"
 ```
 
-Then, reload your shell configuration:
+## Template Configuration
+
+### Creating a Template for the Repository
+
+You can create a custom template specific to the repository using the `create-template` command. This template will override the global template set in the TEMPLATE_COMMIT environment variable if present.
 
 ```bash
-source ~/.bashrc # For Bash
-source ~/.zshrc # For Zsh
+comai create-template "My repository-specific template: {message}"
 ```
+
+This command will create a hidden file inside the `.git` directory to store the template.
 
 ## Usage
 
-After staging your changes using git add, run the comai command with a positional argument being a high-level explanation of the commit:
+### Generating Commit Messages
 
 ```bash
 comai "This is a high level explanation of my commit"
 ```
 
-To stage all changes before generating the commit message, use the -a or --add flag:
+- Use the -a or --add flag to stage all changes.
+- Use the -c or --commit flag to automatically create the commit.
+- Use the -t or --template flag for custom templates or utilize the TEMPLATE_COMMIT environment variable. If no template is provided, a default or global template will be used.
+
+### Resetting Commits
+
+Use the `back` command to reset to previous commits. This is equivalent to `git reset HEAD~n`, where `n` is the number of commits to reset.
 
 ```bash
-comai -a "This is a high level explanation of my commit"
-```
-
-Comai will generate a commit message based on your staged changes and display it. If you are satisfied with the generated message, run the following command to create the commit:
-
-```bash
-git commit -m "<generated commit message>"
-```
-
-Alternatively, you can use the -c or --commit flag to automatically create the commit with the generated message:
-
-```bash
-comai -c "This is a high level explanation of my commit"
-```
-
-If you want to use a specific template for your commit messages, you can set the **TEMPLATE_COMMIT** environment variable in your shell configuration file or pass it as a command-line argument using the -t or --template flag:
-
-```bash
-comai --template "My custom template: {message}" "This is a high level explanation of my commit"
-```
-
-To use a different engine model, you can use the -m or --model flag, with the default value set to "gpt-4":
-
-```bash
-comai --model "gpt-3" "This is a high level explanation of my commit"
+comai back 1 # Resets one commit back
+comai back 2 # Resets two commits back
 ```
 
 ## Contributing
