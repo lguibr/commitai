@@ -14,7 +14,7 @@ Comai is a command-line tool that helps you generate informative and relevant co
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/comai.git
+git clone https://github.com/lguibr/comai.git
 
 ```
 
