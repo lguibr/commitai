@@ -1,7 +1,3 @@
-I apologize for the inconvenience. Let me provide the README and `.gitignore` files without the markdown formatting:
-
-README:
-
 # Comai - Commit Message AI
 
 Comai is a command-line tool that helps you generate informative and relevant commit messages for your Git repositories using AI language models like GPT-4 and Claude. It analyzes your staged changes, combines them with a high-level explanation provided by you, and creates a commit message based on this information. Additionally, it supports custom commit message templates and a back command to reset to previous commits. This not only saves you time and effort but also ensures a consistent and meaningful commit history.
@@ -65,37 +61,3 @@ We welcome contributions to the Comai project! Please feel free to submit issues
 ## License
 
 This project is released under the MIT License.
-
-.gitignore:
-
-# Byte-compiled / optimized / DLL files
-
-**pycache**/
-_.py[cod]
-_$py.class
-
-# Distribution / packaging
-
-dist/
-build/
-_.egg-info/
-_.egg
-
-# Virtual environments
-
-venv/
-.venv/
-
-# IDE files
-
-.vscode/
-.idea/
-
-# Miscellaneous
-
-_.log
-_.swp
-_.swo
-_.bak
-
-I hope this format is easier to copy. Let me know if you have any further questions!
