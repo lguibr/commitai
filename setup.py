@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 repo_url = "https://github.com/lguibr/commitai"
 setup(
     name="commitai",
-    version="0.1.3",
+    version="0.1.4",
     author="Luis Guilherme",
     author_email="lgpelin92@gmail.com",
     packages=find_packages(),
@@ -16,8 +16,8 @@ setup(
     url=repo_url,
     project_urls={
         "Bug Tracker": f"{repo_url}/issues",
-        "Documentation": "{repo_url}/blob/main/README.md",
-        "Source Code": {repo_url},
+        "Documentation": f"{repo_url}/blob/main/README.md",
+        "Source Code": repo_url,
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
