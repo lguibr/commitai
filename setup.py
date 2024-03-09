@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 repo_url = "https://github.com/lguibr/commitai"
 setup(
     name="commitai",
-    version="0.1.8",
+    version="0.1.9",
     author="Luis Guilherme",
     author_email="lgpelin92@gmail.com",
     packages=find_packages(),
