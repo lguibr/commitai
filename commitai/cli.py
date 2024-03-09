@@ -5,7 +5,7 @@ import click
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 
-from comai.git import (
+from commitai.git import (
     create_commit,
     get_commit_template,
     get_current_branch_name,

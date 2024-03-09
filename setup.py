@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
-    name="comai",
+    name="commitai",
     version="0.1.0",
     packages=find_packages(),
     long_description=long_description,
@@ -19,7 +19,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "comai = comai.cli:main",
+            "commitai = commitai.cli:main",
         ],
     },
 )

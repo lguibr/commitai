@@ -1,6 +1,6 @@
-# Comai - Commit Message AI
+# commitai - Commit Message AI
 
-Comai is a command-line tool that helps you generate informative and relevant commit messages for your Git repositories using AI language models like GPT-4 and Claude. It analyzes your staged changes, combines them with a high-level explanation provided by you, and creates a commit message based on this information. Additionally, it supports custom commit message templates and a back command to reset to previous commits. This not only saves you time and effort but also ensures a consistent and meaningful commit history.
+commitai is a command-line tool that helps you generate informative and relevant commit messages for your Git repositories using AI language models like GPT-4 and Claude. It analyzes your staged changes, combines them with a high-level explanation provided by you, and creates a commit message based on this information. Additionally, it supports custom commit message templates and a back command to reset to previous commits. This not only saves you time and effort but also ensures a consistent and meaningful commit history.
 
 ## Prerequisites
 
@@ -9,15 +9,15 @@ Comai is a command-line tool that helps you generate informative and relevant co
 
 ## Installation
 
-You can install comai using pip:
+You can install commitai using pip:
 
-pip install comai
+pip install commitai
 
 ## Configuration
 
 ### Environment Variables
 
-Before using Comai, you need to set the API key environment variables for the language models you want to use. For example:
+Before using commitai, you need to set the API key environment variables for the language models you want to use. For example:
 
 export OPENAI_API_KEY="your_openai_api_key"
 export ANTHROPIC_API_KEY="your_anthropic_api_key"
@@ -32,7 +32,7 @@ export TEMPLATE_COMMIT="My global custom template: {message}"
 
 You can create a custom template specific to the repository using the `create-template` command. This template will override the global template set in the `TEMPLATE_COMMIT` environment variable if present.
 
-comai create-template "My repository-specific template: {message}"
+commitai create-template "My repository-specific template: {message}"
 
 This command will create a hidden file inside the `.git` directory to store the template.
 
@@ -40,7 +40,7 @@ This command will create a hidden file inside the `.git` directory to store the 
 
 ### Generating Commit Messages
 
-comai generate "This is a high-level explanation of my commit"
+commitai generate "This is a high-level explanation of my commit"
 
 - Use the `-a` or `--add` flag to stage all changes.
 - Use the `-c` or `--commit` flag to automatically create the commit.
@@ -51,12 +51,12 @@ comai generate "This is a high-level explanation of my commit"
 
 Use the `back` command to reset to previous commits. This is equivalent to `git reset HEAD~n`, where `n` is the number of commits to reset.
 
-comai back 1 # Resets one commit back
-comai back 2 # Resets two commits back
+commitai back 1 # Resets one commit back
+commitai back 2 # Resets two commits back
 
 ## Contributing
 
-We welcome contributions to the Comai project! Please feel free to submit issues, feature requests, or pull requests.
+We welcome contributions to the commitai project! Please feel free to submit issues, feature requests, or pull requests.
 
 ## License
 
