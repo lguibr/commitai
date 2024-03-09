@@ -7,8 +7,6 @@ setup(
     packages=find_packages(),
     install_requires=[
         "langchain",
-        "openai",
-        "anthropic",
         "click",
         "langchain-community",
         "langchain-anthropic",
