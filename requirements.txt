@@ -3,3 +3,4 @@ langchain-anthropic
 langchain-openai
 langchain
 langchain-community
+setuptools
