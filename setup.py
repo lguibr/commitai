@@ -37,6 +37,7 @@ setup(
         "langchain-community",
         "langchain-anthropic",
         "langchain-openai",
+        "setuptools",
     ],
     entry_points={
         "console_scripts": [

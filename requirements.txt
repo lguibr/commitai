@@ -4,3 +4,4 @@ langchain-openai
 langchain
 langchain-community
 setuptools
+types-setuptools
