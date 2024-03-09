@@ -30,6 +30,11 @@ export TEMPLATE_COMMIT="My global custom template: {message}"
 
 #### Creating a Template for the Repository
 
+[![CI](https://github.com/lguibr/comai/workflows/CI/badge.svg)](https://github.com/lguibr/comai/actions)
+[![PyPI](https://img.shields.io/pypi/v/comai.svg)](https://pypi.org/project/comai/)
+[![Python Version](https://img.shields.io/pypi/pyversions/comai.svg)](https://pypi.org/project/comai/)
+[![License](https://img.shields.io/pypi/l/comai.svg)](https://github.com/lguibr/comai/blob/main/LICENSE)
+
 You can create a custom template specific to the repository using the `create-template` command. This template will override the global template set in the `TEMPLATE_COMMIT` environment variable if present.
 
 commitai create-template "My repository-specific template: {message}"
