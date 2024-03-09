@@ -17,7 +17,7 @@ setup(
     project_urls={
         "Bug Tracker": f"{repo_url}/issues",
         "Documentation": "{repo_url}/blob/main/README.md",
-        "Source Code": "{repo_url}",
+        "Source Code": {repo_url},
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
