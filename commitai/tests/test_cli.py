@@ -25,9 +25,10 @@ def test_generate_message_command():
             patch("commitai.cli.get_repository_name") as mock_get_repo_name,
             patch(
                 "commitai.cli.get_current_branch_name"
-            ) as mock_get_branch_name,  # noqa
+            ) as mock_get_branch_name,  # noqa: W504
             patch("commitai.cli.get_commit_template"),
             patch("commitai.cli.create_commit"),
+            patch("click.edit") as mock_edit,
         ):
             content_mock = MagicMock(content="Generated commit message")
             mock_openai.return_value.invoke.return_value = content_mock
@@ -39,6 +40,7 @@ def test_generate_message_command():
 
             result = runner.invoke(cli, ["commitai", "Test explanation"])
             assert "Generated commit message" in result.output
+            mock_edit.assert_called()  # Ensures click.edit was called
 
 
 def test_create_template_command():
@@ -60,22 +62,21 @@ def test_commitai_command():
         patch("commitai.cli.generate_message") as mock_generate_message,
         patch("commitai.cli.stage_all_changes") as mock_stage_changes,
     ):
-        result = runner.invoke(
-            cli,
-            ["commitai", "Test explanation"],
-        )
+        # Testing without -c flag (should not commit directly)
+        result = runner.invoke(cli, ["commitai", "Test explanation"])
         assert result.exit_code == 0
         mock_generate_message.assert_called_once_with(
-            description=("Test explanation",), add=False, commit=True
+            description=("Test explanation",), add=False, commit=False
         )
 
+        # Testing with -a flag and without -c flag
         result = runner.invoke(cli, ["commitai", "-a"])
         assert result.exit_code == 0
         mock_stage_changes.assert_called_once()
         mock_generate_message.assert_called_with(
             description=(),
             add=True,
-            commit=True,
+            commit=False,  # Should be False because -c flag is not used
         )
 
 

@@ -61,11 +61,6 @@ def generate_message(description, commit, template, add, model):
     if add:
         stage_all_changes()
 
-    click.secho(
-        "\n🔍 Looking for a native pre-commit hook and running it\n",
-        fg="blue",
-        bold=True,
-    )
     if not run_pre_commit_hook():
         click.secho(
             "🚫 Pre-commit hook failed. Aborting commit.",
@@ -82,9 +77,6 @@ def generate_message(description, commit, template, add, model):
             bold=True,
         )
         return
-
-    # Clear the terminal using click
-    click.clear()
 
     repo_name = get_repository_name()
     branch_name = get_current_branch_name()
@@ -108,35 +100,28 @@ def generate_message(description, commit, template, add, model):
             f"Here is a high-level explanation of the commit: {explanation}"
             f"\n\n{user_message}"
         )
-    click.secho(
-        "\n\n🧠 Analyzing the changes and generating a commit message...\n\n",
-        fg="blue",
-        bold=True,
-    ),
 
     input_message = f"{system_message}\n\n{user_message}"
     ai_message = llm.invoke(input=input_message)
     commit_message = ai_message.content
 
-    if commit:
-        # Commit directly if -c is specified
-        create_commit(commit_message)
-        click.secho(
-            f"\n\n✅ Committed message:\n\n{commit_message}\n\n",
-            fg="green",
-            bold=True,
-        )
-    else:
-        # Open the editor for manual commit message editing if not -c
-        repo_path = get_repository_name()
-        commit_msg_path = os.path.join(repo_path, ".git", "COMMIT_EDITMSG")
-        with open(commit_msg_path, "w") as f:
-            f.write(commit_message)
+    repo_path = get_repository_name()
+    commit_msg_path = os.path.join(repo_path, ".git", "COMMIT_EDITMSG")
+    with open(commit_msg_path, "w") as f:
+        f.write(commit_message)
+
+    if not commit:
         click.edit(filename=commit_msg_path)
-        click.secho(
-            "📝 Commit message prepared. Please review and commit manually.",
-            fg="blue",
-        )
+
+    with open(commit_msg_path, "r") as f:
+        final_commit_message = f.read().strip()
+
+    create_commit(final_commit_message)
+    click.secho(
+        f"\n\n✅ Committed message:\n\n{final_commit_message}\n\n",
+        fg="green",
+        bold=True,
+    )
 
 
 @cli.command(name="create-template")
@@ -158,11 +143,22 @@ def create_template_command(template_content):
     is_flag=True,
     help="Stage all changes before generating the commit message",
 )
+@click.option(
+    "--commit",
+    "-c",
+    is_flag=True,
+    help="Commit the changes with the generated message",
+)
 @click.pass_context
-def commitai(ctx, description, add):
+def commitai(ctx, description, add, commit):
     if add:
         stage_all_changes()
-    ctx.invoke(generate_message, description=description, add=add, commit=True)
+    ctx.invoke(
+        generate_message,
+        description=description,
+        add=add,
+        commit=commit,
+    )
 
 
 @click.command(name="commitai-create-template")
