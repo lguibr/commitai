@@ -52,13 +52,6 @@ commitai generate "This is a high-level explanation of my commit"
 - Use the `-t` or `--template` flag for custom templates or utilize the `TEMPLATE_COMMIT` environment variable. If no template is provided, a default or global template will be used.
 - Use the `-m` or `--model` flag to specify the language model to use (default: `gpt-4`).
 
-### Resetting Commits
-
-Use the `back` command to reset to previous commits. This is equivalent to `git reset HEAD~n`, where `n` is the number of commits to reset.
-
-commitai back 1 # Resets one commit back
-commitai back 2 # Resets two commits back
-
 ## Contributing
 
 We welcome contributions to the commitai project! Please feel free to submit issues, feature requests, or pull requests.

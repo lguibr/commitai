@@ -46,7 +46,3 @@ def save_commit_template(template: str) -> None:
     template_path = os.path.join(repo_path, ".git", "commit_template.txt")
     with open(template_path, "w") as f:
         f.write(template)
-
-
-def perform_git_reset(steps_back: int) -> None:
-    subprocess.run(["git", "reset", f"HEAD~{steps_back}"])

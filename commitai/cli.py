@@ -9,7 +9,6 @@ from commitai.git import (
     get_current_branch_name,
     get_repository_name,
     get_staged_changes_diff,
-    perform_git_reset,
     save_commit_template,
     stage_all_changes,
 )
@@ -21,21 +20,7 @@ def cli():
 
 
 @cli.command()
-@click.argument("steps_back", type=int)
-def back(steps_back):
-    perform_git_reset(steps_back)
-    click.echo(f"Successfully performed git reset HEAD~{steps_back}.")
-
-
-@cli.command()
-@click.argument("template_content")
-def create_template(template_content):
-    save_commit_template(template_content)
-    click.echo("Template saved successfully.")
-
-
-@cli.command()
-@click.argument("explanation", required=False)
+@click.argument("description_or_command", nargs=-1, type=click.UNPROCESSED)
 @click.option(
     "--commit",
     "-c",
@@ -60,7 +45,26 @@ def create_template(template_content):
     default="claude-opus",
     help="Set the engine model to be used",
 )
-def main(explanation, commit, template, add, model):
+def main(description_or_command, commit, template, add, model):
+
+    description_or_command_exists = len(description_or_command) > 1
+    is_command = (
+        description_or_command[0] == "create-template"
+        if description_or_command_exists
+        else False
+    )
+
+    if is_command:
+        if len(description_or_command) > 1:
+            template_content = " ".join(description_or_command[1:])
+            save_commit_template(template_content)
+            click.echo("Template saved successfully.")
+            return
+        else:
+            click.echo("Please provide the template content.")
+        return
+
+    explanation = " ".join(description_or_command)
     if model == "gpt-4":
         llm = ChatOpenAI(model_name="gpt-4")
     elif model == "claude-opus":
