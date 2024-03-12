@@ -109,7 +109,7 @@ def generate_message(description, commit, template, add, model):
             f"\n\n{user_message}"
         )
     click.secho(
-        "🧠 Analyzing the changes and generating a commit message...",
+        "\n\n🧠 Analyzing the changes and generating a commit message...\n\n",
         fg="blue",
         bold=True,
     ),
