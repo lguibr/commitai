@@ -121,7 +121,11 @@ def generate_message(description, commit, template, add, model):
     if commit:
         # Commit directly if -c is specified
         create_commit(commit_message)
-        click.secho(f"✅ Committed message:\n\n{commit_message}", fg="green")
+        click.secho(
+            f"\n\n✅ Committed message:\n\n{commit_message}\n\n",
+            fg="green",
+            bold=True,
+        )
     else:
         # Open the editor for manual commit message editing if not -c
         repo_path = get_repository_name()
