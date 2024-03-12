@@ -48,7 +48,7 @@ You can create a custom template specific to the repository using the `create-te
 commitai create-template "My repository-specific template: {message}"
 
 This command will create a hidden file inside the `.git` directory to store the template.
-
+T
 ## Usage
 
 ### Generating Commit Messages
