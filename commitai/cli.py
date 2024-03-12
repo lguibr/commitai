@@ -62,7 +62,7 @@ def generate_message(description, commit, template, add, model):
         stage_all_changes()
 
     click.secho(
-        "🔍 Looking for a native pre-commit hook and running it",
+        "\n🔍 Looking for a native pre-commit hook and running it\n",
         fg="blue",
         bold=True,
     )
@@ -73,6 +73,9 @@ def generate_message(description, commit, template, add, model):
             bold=True,
         )
         return
+
+    # Clear the terminal
+    os.system("clear")
 
     diff = get_staged_changes_diff()
     if not diff:
