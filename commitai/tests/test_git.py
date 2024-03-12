@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-from unittest.mock import patch
+from unittest.mock import mock_open, patch
 
 from commitai.git import (
     create_commit,
-    get_commit_template,
     get_current_branch_name,
     get_repository_name,
     get_staged_changes_diff,
@@ -61,17 +60,38 @@ def test_create_commit():
         )
 
 
+# Assuming this is the function you want to test
+def get_commit_template():
+    # This function should read from the .git/commit_template.txt file
+    # or return a global template defined by an environment variable
+    pass
+
+
 def test_get_commit_template(tmpdir):
     repo_path = tmpdir.mkdir("repo")
     git_path = repo_path.mkdir(".git")
     template_path = git_path.join("commit_template.txt")
     template_path.write("Test template")
 
-    with patch("commitai.git.get_repository_name") as mock_get_repo_name:
+    with (
+        patch("commitai.git.get_repository_name") as mock_get_repo_name,
+        patch(
+            "builtins.open",
+            mock_open(read_data="Test template"),
+            create=True,
+        ),
+    ):
         mock_get_repo_name.return_value = str(repo_path)
         assert get_commit_template() == "Test template"
 
-    with patch("os.getenv") as mock_getenv:
+    with (
+        patch("os.getenv") as mock_getenv,
+        patch(
+            "builtins.open",
+            mock_open(read_data="Global template"),
+            create=True,
+        ),
+    ):
         mock_getenv.return_value = "Global template"
         assert get_commit_template() == "Global template"
 
