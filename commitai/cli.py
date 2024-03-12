@@ -74,9 +74,6 @@ def generate_message(description, commit, template, add, model):
         )
         return
 
-    # Clear the terminal
-    os.system("clear")
-
     diff = get_staged_changes_diff()
     if not diff:
         click.secho(
@@ -85,6 +82,9 @@ def generate_message(description, commit, template, add, model):
             bold=True,
         )
         return
+
+    # Clear the terminal using click
+    click.clear()
 
     repo_name = get_repository_name()
     branch_name = get_current_branch_name()
@@ -108,6 +108,11 @@ def generate_message(description, commit, template, add, model):
             f"Here is a high-level explanation of the commit: {explanation}"
             f"\n\n{user_message}"
         )
+    click.secho(
+        "🧠 Analyzing the changes and generating a commit message...",
+        fg="blue",
+        bold=True,
+    ),
 
     input_message = f"{system_message}\n\n{user_message}"
     ai_message = llm.invoke(input=input_message)
