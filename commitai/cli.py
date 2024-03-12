@@ -22,8 +22,8 @@ def cli():
     pass
 
 
-@cli.command()
-@click.argument("description_or_command", nargs=-1, type=click.UNPROCESSED)
+@cli.command(name="generate")
+@click.argument("description", nargs=-1, type=click.UNPROCESSED)
 @click.option(
     "--commit",
     "-c",
@@ -48,44 +48,34 @@ def cli():
     default="claude-opus",
     help="Set the engine model to be used",
 )
-def main(description_or_command, commit, template, add, model):
-
-    description_or_command_exists = len(description_or_command) > 1
-    is_command = (
-        description_or_command[0] == "create-template"
-        if description_or_command_exists
-        else False
-    )
-
-    if is_command:
-        if len(description_or_command) > 1:
-            template_content = " ".join(description_or_command[1:])
-            save_commit_template(template_content)
-            click.echo("Template saved successfully.")
-            return
-        else:
-            click.echo("Please provide the template content.")
-        return
-
-    explanation = " ".join(description_or_command)
+def generate_message(description, commit, template, add, model):
+    explanation = " ".join(description)
     if model == "gpt-4":
         llm = ChatOpenAI(model_name="gpt-4")
     elif model == "claude-opus":
         llm = ChatAnthropic(model="claude-3-opus-20240229")
     else:
-        click.echo(f"Unsupported model: {model}")
+        click.secho(f"🚫 Unsupported model: {model}", fg="red", bold=True)
         return
 
     if add:
         stage_all_changes()
 
     if not run_pre_commit_hook():
-        click.echo("Pre-commit hook failed. Aborting commit.")
+        click.secho(
+            "🚫 Pre-commit hook failed. Aborting commit.",
+            fg="red",
+            bold=True,
+        )
         return
 
     diff = get_staged_changes_diff()
     if not diff:
-        click.echo("Warning: No staged changes found. Exiting.")
+        click.secho(
+            "⚠️ Warning: No staged changes found. Exiting.",
+            fg="yellow",
+            bold=True,
+        )
         return
 
     repo_name = get_repository_name()
@@ -101,7 +91,7 @@ def main(description_or_command, commit, template, add, model):
         "Try to be meaningful and avoid generic messages."
     )
     if template:
-        system_message += "The message should follow this template: "
+        system_message += " The message should follow this template: "
         system_message += template
 
     user_message = formatted_diff
@@ -112,14 +102,12 @@ def main(description_or_command, commit, template, add, model):
         )
 
     input_message = f"{system_message}\n\n{user_message}"
-    click.echo("\n\nGenerating commit message...\n\n")
-
     ai_message = llm.invoke(input=input_message)
     commit_message = ai_message.content
 
     if commit:
         create_commit(commit_message)
-        click.echo(f"Committed message:\n\n{commit_message}")
+        click.secho(f"✅ Committed message:\n\n{commit_message}", fg="green")
     else:
         repo_path = get_repository_name()
         commit_msg_path = os.path.join(repo_path, ".git", "COMMIT_EDITMSG")
@@ -134,7 +122,47 @@ def main(description_or_command, commit, template, add, model):
 
         # Create the commit with the edited message
         create_commit(edited_commit_message)
-        click.echo(f"Committed message:\n\n{edited_commit_message}")
+        click.secho(
+            f"✅ Committed message:\n\n{edited_commit_message}",
+            fg="green",
+        )
+
+
+@cli.command(name="create-template")
+@click.argument("template_content", nargs=-1, type=click.UNPROCESSED)
+def create_template_command(template_content):
+    template_content = " ".join(template_content)
+    if template_content:
+        save_commit_template(template_content)
+        click.secho("📝 Template saved successfully.", fg="green")
+    else:
+        click.secho("❗ Please provide the template content.", fg="red")
+
+
+@click.command(name="commitai")
+@click.argument("description", nargs=-1, type=click.UNPROCESSED)
+@click.option(
+    "--add",
+    "-a",
+    is_flag=True,
+    help="Stage all changes before generating the commit message",
+)
+@click.pass_context
+def commitai(ctx, description, add):
+    if add:
+        stage_all_changes()
+    ctx.invoke(generate_message, description=description, add=add, commit=True)
+
+
+@click.command(name="commitai-create-template")
+@click.argument("template_content", nargs=-1, type=click.UNPROCESSED)
+@click.pass_context
+def commitai_create_template(ctx, template_content):
+    ctx.invoke(create_template_command, template_content=template_content)
+
+
+cli.add_command(commitai)
+cli.add_command(commitai_create_template)
 
 
 if __name__ == "__main__":

@@ -41,7 +41,8 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "commitai = commitai.cli:main",
+            "commitai = commitai.cli:commitai",
+            "commitai-create-template = commitai.cli:commitai_create_template",
         ],
     },
 )

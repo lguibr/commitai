@@ -1,6 +1,7 @@
 # CommitAi - Commit Message AI
 
 [![CI](https://github.com/lguibr/commitai/workflows/CI/badge.svg)](https://github.com/lguibr/commitai/actions)
+[![codecov](https://codecov.io/gh/lguibr/commitai/graph/badge.svg?token=MXZKCXO6LA)](https://codecov.io/gh/lguibr/commitai)
 [![PyPI](https://img.shields.io/pypi/v/CommitAi.svg)](https://pypi.org/project/CommitAi/)
 [![Python Version](https://img.shields.io/pypi/pyversions/CommitAi.svg)](https://pypi.org/project/CommitAi/)
 [![License](https://img.shields.io/pypi/l/CommitAi.svg)](https://github.com/lguibr/CommitAi/blob/main/LICENSE)
