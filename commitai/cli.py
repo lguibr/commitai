@@ -61,6 +61,12 @@ def generate_message(description, commit, template, add, model):
     if add:
         stage_all_changes()
 
+    click.secho(
+        "\n🔍 Looking for a native pre-commit hook and running it\n",
+        fg="blue",
+        bold=True,
+    )
+
     if not run_pre_commit_hook():
         click.secho(
             "🚫 Pre-commit hook failed. Aborting commit.",
@@ -77,6 +83,9 @@ def generate_message(description, commit, template, add, model):
             bold=True,
         )
         return
+
+    # Clear the terminal using click
+    click.clear()
 
     repo_name = get_repository_name()
     branch_name = get_current_branch_name()
@@ -102,6 +111,11 @@ def generate_message(description, commit, template, add, model):
         )
 
     input_message = f"{system_message}\n\n{user_message}"
+    click.secho(
+        "\n\n🧠 Analyzing the changes and generating a commit message...\n\n",
+        fg="blue",
+        bold=True,
+    ),
     ai_message = llm.invoke(input=input_message)
     commit_message = ai_message.content
 
