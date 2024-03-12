@@ -61,6 +61,11 @@ def generate_message(description, commit, template, add, model):
     if add:
         stage_all_changes()
 
+    click.secho(
+        "🔍 Looking for a native pre-commit hook and running it",
+        fg="blue",
+        bold=True,
+    )
     if not run_pre_commit_hook():
         click.secho(
             "🚫 Pre-commit hook failed. Aborting commit.",
@@ -97,8 +102,8 @@ def generate_message(description, commit, template, add, model):
     user_message = formatted_diff
     if explanation:
         user_message = (
-            f"Here is a high-level explanation of the commit: "
-            f"{explanation}\n\n{user_message}"
+            f"Here is a high-level explanation of the commit: {explanation}"
+            f"\n\n{user_message}"
         )
 
     input_message = f"{system_message}\n\n{user_message}"
@@ -106,25 +111,19 @@ def generate_message(description, commit, template, add, model):
     commit_message = ai_message.content
 
     if commit:
+        # Commit directly if -c is specified
         create_commit(commit_message)
         click.secho(f"✅ Committed message:\n\n{commit_message}", fg="green")
     else:
+        # Open the editor for manual commit message editing if not -c
         repo_path = get_repository_name()
         commit_msg_path = os.path.join(repo_path, ".git", "COMMIT_EDITMSG")
-        # Open default git editor for editing the commit message
         with open(commit_msg_path, "w") as f:
             f.write(commit_message)
-        click.edit(filename=".git/COMMIT_EDITMSG")
-
-        # Read the edited commit message
-        with open(commit_msg_path, "r") as f:
-            edited_commit_message = f.read().strip()
-
-        # Create the commit with the edited message
-        create_commit(edited_commit_message)
+        click.edit(filename=commit_msg_path)
         click.secho(
-            f"✅ Committed message:\n\n{edited_commit_message}",
-            fg="green",
+            "📝 Commit message prepared. Please review and commit manually.",
+            fg="blue",
         )
 
 
