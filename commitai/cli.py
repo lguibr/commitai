@@ -81,7 +81,6 @@ def main(description_or_command, commit, template, add, model):
 
     if not run_pre_commit_hook():
         click.echo("Pre-commit hook failed. Aborting commit.")
-
         return
 
     diff = get_staged_changes_diff()
@@ -113,6 +112,8 @@ def main(description_or_command, commit, template, add, model):
         )
 
     input_message = f"{system_message}\n\n{user_message}"
+    click.echo("\n\nGenerating commit message...\n\n")
+
     ai_message = llm.invoke(input=input_message)
     commit_message = ai_message.content
 
