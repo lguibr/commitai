@@ -38,7 +38,7 @@ def get_commit_template() -> Optional[str]:
     if os.path.exists(template_path):
         with open(template_path, "r") as f:
             return f.read()
-    return None
+    return os.getenv("TEMPLATE_COMMIT")
 
 
 def save_commit_template(template: str) -> None:

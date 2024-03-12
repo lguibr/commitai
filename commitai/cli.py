@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-import os
-
 import click
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
@@ -47,7 +45,7 @@ def create_template(template_content):
 @click.option(
     "--template",
     "-t",
-    default=os.getenv("TEMPLATE_COMMIT"),
+    default=None,
     help="Specify a commit message template",
 )
 @click.option(
