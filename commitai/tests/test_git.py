@@ -3,6 +3,7 @@ from unittest.mock import mock_open, patch
 
 from commitai.git import (
     create_commit,
+    get_commit_template,
     get_current_branch_name,
     get_repository_name,
     get_staged_changes_diff,
@@ -58,13 +59,6 @@ def test_create_commit():
                 "Test commit message",
             ]
         )
-
-
-# Assuming this is the function you want to test
-def get_commit_template():
-    # This function should read from the .git/commit_template.txt file
-    # or return a global template defined by an environment variable
-    pass
 
 
 def test_get_commit_template(tmpdir):
