@@ -32,6 +32,18 @@ def create_commit(message: str) -> None:
     subprocess.run(["git", "commit", "-m", message])
 
 
+def run_pre_commit_hook() -> bool:
+    repo_path = get_repository_name()
+    pre_commit_path = os.path.join(repo_path, ".git", "hooks", "pre-commit")
+    if os.path.exists(pre_commit_path) and os.access(pre_commit_path, os.X_OK):
+        try:
+            subprocess.check_call(pre_commit_path)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+    return True
+
+
 def get_commit_template() -> Optional[str]:
     repo_path = get_repository_name()
     template_path = os.path.join(repo_path, ".git", "commit_template.txt")

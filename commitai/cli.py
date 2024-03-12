@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import os
+
 import click
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
@@ -9,6 +11,7 @@ from commitai.git import (
     get_current_branch_name,
     get_repository_name,
     get_staged_changes_diff,
+    run_pre_commit_hook,
     save_commit_template,
     stage_all_changes,
 )
@@ -76,6 +79,11 @@ def main(description_or_command, commit, template, add, model):
     if add:
         stage_all_changes()
 
+    if not run_pre_commit_hook():
+        click.echo("Pre-commit hook failed. Aborting commit.")
+
+        return
+
     diff = get_staged_changes_diff()
     if not diff:
         click.echo("Warning: No staged changes found. Exiting.")
@@ -112,13 +120,15 @@ def main(description_or_command, commit, template, add, model):
         create_commit(commit_message)
         click.echo(f"Committed message:\n\n{commit_message}")
     else:
+        repo_path = get_repository_name()
+        commit_msg_path = os.path.join(repo_path, ".git", "COMMIT_EDITMSG")
         # Open default git editor for editing the commit message
-        with open(".git/COMMIT_EDITMSG", "w") as f:
+        with open(commit_msg_path, "w") as f:
             f.write(commit_message)
         click.edit(filename=".git/COMMIT_EDITMSG")
 
         # Read the edited commit message
-        with open(".git/COMMIT_EDITMSG", "r") as f:
+        with open(commit_msg_path, "r") as f:
             edited_commit_message = f.read().strip()
 
         # Create the commit with the edited message
