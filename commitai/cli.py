@@ -15,7 +15,7 @@ from commitai.git import (
     save_commit_template,
     stage_all_changes,
 )
-from commitai.templates import (
+from commitai.template import (
     adding_template,
     build_user_message,
     default_system_message,

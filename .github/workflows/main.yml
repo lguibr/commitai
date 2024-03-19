@@ -55,7 +55,7 @@ jobs:
           pip install pytest pytest-cov
       - name: Run tests with coverage
         run: |
-          pytest --cov=commitai ./
+          pytest --cov=commitai ./commitai
       - name: Generate coverage report
         run: |
           coverage report -m
