@@ -15,8 +15,11 @@ from commitai.git import (
     save_commit_template,
     stage_all_changes,
 )
-from commitai.templates import build_user_message  # noqa
-from commitai.templates import adding_template, default_system_message
+from commitai.templates import (
+    adding_template,
+    build_user_message,
+    default_system_message,
+)
 
 
 @click.group(context_settings=dict(help_option_names=["-h", "--help"]))
