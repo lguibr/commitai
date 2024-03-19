@@ -15,6 +15,8 @@ from commitai.git import (
     save_commit_template,
     stage_all_changes,
 )
+from commitai.templates import build_user_message  # noqa
+from commitai.templates import adding_template, default_system_message
 
 
 @click.group(context_settings=dict(help_option_names=["-h", "--help"]))
@@ -93,24 +95,16 @@ def generate_message(description, commit, template, add, model):
 
     if not template:
         template = get_commit_template()
-
-    system_message = (
-        "You are a helpful git commit assistant. "
-        "You will receive a git diff and generate a commit message."
-        "Try to be meaningful and avoid generic messages."
-    )
+    system_message: str = ""
     if template:
-        system_message += " The message should follow this template: "
+        system_message += default_system_message
+        system_message += adding_template
         system_message += template
 
-    user_message = formatted_diff
     if explanation:
-        user_message = (
-            f"Here is a high-level explanation of the commit: {explanation}"
-            f"\n\n{user_message}"
-        )
+        diff = build_user_message(explanation, formatted_diff)
 
-    input_message = f"{system_message}\n\n{user_message}"
+    input_message = f"{system_message}\n\n{diff}"
     click.secho(
         "\n\n🧠 Analyzing the changes and generating a commit message...\n\n",
         fg="blue",
