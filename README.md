@@ -1,4 +1,4 @@
-# CommitAi - Commit Message AI
+# CommitAi - Your AI-Powered Commit Assistant
 
 [![CI](https://github.com/lguibr/commitai/workflows/CI/badge.svg)](https://github.com/lguibr/commitai/actions)
 [![codecov](https://codecov.io/gh/lguibr/commitai/graph/badge.svg?token=MXZKCXO6LA)](https://codecov.io/gh/lguibr/commitai)
@@ -6,64 +6,80 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/CommitAi.svg)](https://pypi.org/project/CommitAi/)
 [![License](https://img.shields.io/pypi/l/CommitAi.svg)](https://github.com/lguibr/CommitAi/blob/main/LICENSE)
 
-CommitAi is a command-line tool that helps you generate informative and relevant commit messages for your Git repositories using AI language models like GPT-4 and Claude. It analyzes your staged changes, combines them with a high-level explanation provided by you, and creates a commit message based on this information. Additionally, it supports custom commit message templates. This not only saves you time and effort but also ensures a consistent and meaningful commit history.
+**CommitAi** simplifies the Git commit message creation process by leveraging AI technologies, including GPT-4 and Claude. Designed for developers who value clarity and precision in commit histories, **CommitAi** offers a streamlined workflow that transforms your staged changes and high-level explanations into informative commit messages. Enhance your project documentation and streamline your development process with commit messages that truly reflect your changes.
 
 ## Features
 
-- Automatically runs the repository's pre-commit hook (if it exists) before generating the commit message to avoid discarded commit costs.
-- Generates informative and relevant commit messages based on staged changes and user-provided explanations.
-- Supports custom commit message templates.
-- Integrates with AI language models like GPT-4 and Claude for intelligent commit message generation.
+- **Intelligent Commit Generation**: Leverages state-of-the-art AI models to generate meaningful commit messages from your changes.
+- **Pre-commit Checks**: Automatically runs configured pre-commit hooks to ensure quality and consistency before generating messages.
+- **Template Support**: Utilizes both global and repository-specific commit message templates to maintain a consistent style across your projects.
+- **AI Model Integration**: Supports multiple AI models, including GPT-4 by OpenAI and Claude by Anthropic, ensuring versatility in natural language processing capabilities.
 
-## Prerequisites
+## Getting Started
 
-- Python 3.x
-- API keys for the desired language models (e.g., OpenAI API key for GPT-4, Anthropic API key for Claude)
+### Prerequisites
 
-## Installation
+- Python 3.6 or later
+- API keys for GPT-4 and Claude, as required
 
-You can install commitai using pip:
+### Installation
 
+Install **CommitAi** directly from PyPI:
+
+```bash
 pip install commitai
+```
 
-## Configuration
+### Configuration
 
-### Environment Variables
+#### API Keys
 
-Before using commitai, you need to set the API key environment variables for the language models you want to use. For example:
+Set the necessary API keys as environment variables:
 
+```bash
 export OPENAI_API_KEY="your_openai_api_key"
 export ANTHROPIC_API_KEY="your_anthropic_api_key"
+```
 
-You can also set the `TEMPLATE_COMMIT` environment variable to define a global template for your commit messages:
+#### Commit Templates
 
+Set a global commit template environment variable:
+
+```bash
 export TEMPLATE_COMMIT="My global custom template: {message}"
+```
 
-### Template Configuration
+Or, create a repository-specific template using:
 
-#### Creating a Template for the Repository
+```bash
+commitai-create-template "My repository-specific template: {message}"
+```
 
-You can create a custom template specific to the repository using the `create-template` command. This template will override the global template set in the `TEMPLATE_COMMIT` environment variable if present.
-
-commitai create-template "My repository-specific template: {message}"
-
-This command will create a hidden file inside the `.git` directory to store the template.
+This creates a hidden template file within the `.git` directory of your repository.
 
 ## Usage
 
-### Generating Commit Messages
+To generate a commit message, provide a high-level explanation of your changes:
 
-commitai generate "This is a high-level explanation of my commit"
+```bash
+commitai "This is a high-level explanation of my commit"
+```
 
-- Use the `-a` or `--add` flag to stage all changes.
-- Use the `-c` or `--commit` flag to automatically create the commit.
-- Use the `-t` or `--template` flag for custom templates or utilize the `TEMPLATE_COMMIT` environment variable. If no template is provided, a default or global template will be used.
-- Use the `-m` or `--model` flag to specify the language model to use (default: `gpt-4`).
+#### Options
+
+- `-a, --add`: Stage all changes before generating the commit message.
+- `-c, --commit`: Automatically create the commit using the generated message.
+- `-t, --template`: Specify a commit template. Defaults to the global template if available.
+- `-m, --model`: Choose the AI model (`gpt-4` by default).
+
+### Additional Commands
+
+- `commitai-create-template`: Set a custom template specific to your repository.
 
 ## Contributing
 
-We welcome contributions to the commitai project! Please feel free to submit issues, feature requests, or pull requests.
+Contributions are welcome! Feel free to fork the repository, push your changes to a branch, and open a pull request. For bugs, questions, or feature requests, please open an issue through the GitHub issue tracker.
 
 ## License
 
-This project is released under the MIT License.
+**CommitAi** is open-source software licensed under the MIT License. See the [LICENSE](https://github.com/lguibr/CommitAi/blob/main/LICENSE) file for more details.
