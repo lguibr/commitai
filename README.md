@@ -8,6 +8,8 @@
 
 **CommitAi** simplifies the Git commit message creation process by leveraging AI technologies, including GPT-4 and Claude. Designed for developers who value clarity and precision in commit histories, **CommitAi** offers a streamlined workflow that transforms your staged changes and high-level explanations into informative commit messages. Enhance your project documentation and streamline your development process with commit messages that truly reflect your changes.
 
+![CommitAi Demo](./assets/commitaai.gif)
+
 ## Features
 
 - **Intelligent Commit Generation**: Leverages state-of-the-art AI models to generate meaningful commit messages from your changes.
