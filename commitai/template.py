@@ -14,9 +14,11 @@ default_system_message = (
     "Footer can contain references to issues, pull requests, or breaking changes."
     "Avoid generic messages like 'update', 'fix bugs', or 'improve code'."
     "Focus on the specific changes made and their impact."
+    "Don't wrap the text in the commit message, or anything like that this text is a commit message directed sent to the user editor in commit process"
 )
 
 adding_template = " The message should follow this template: "
+
 
 
 def build_user_message(explanation, diff):

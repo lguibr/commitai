@@ -1,9 +1,17 @@
+# File: commitai/cli.py
 # -*- coding: utf-8 -*-
+
 import os
 
 import click
-from langchain_anthropic import ChatAnthropic
+# Use built-in imports from langchain
 from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+# Conditional import for Google Generative AI
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+except ImportError:
+    ChatGoogleGenerativeAI = None
 
 from commitai.git import (
     create_commit,
@@ -50,15 +58,26 @@ def cli():
 @click.option(
     "--model",
     "-m",
-    default="claude-opus",
-    help="Set the engine model to be used",
+    default="gemini-2.5-pro-preview-03-25",
+    help=(
+        "Set the engine model to be used (e.g., 'gpt-4', 'claude-3-opus-20240229', 'gemini-pro'). "
+        "Ensure you have the corresponding API key set (OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY)."
+    ),
 )
 def generate_message(description, commit, template, add, model):
     explanation = " ".join(description)
-    if model == "gpt-4":
-        llm = ChatOpenAI(model_name="gpt-4")
-    elif model == "claude-opus":
-        llm = ChatAnthropic(model="claude-3-opus-20240229")
+
+    # Model loading logic
+    if model.startswith("gpt-"):
+        llm = ChatOpenAI(model_name=model, temperature=0.7)
+    elif model.startswith("claude-"):
+        llm = ChatAnthropic(model_name=model, temperature=0.7)
+    elif model.startswith("gemini-"):
+        if ChatGoogleGenerativeAI is None:
+            click.secho("Error: 'langchain-google-genai' is not installed. Run 'pip install langchain-google-genai'", fg="red", bold=True)
+            return
+        # Note: Ensure GOOGLE_API_KEY is set in the environment
+        llm = ChatGoogleGenerativeAI(model=model, temperature=0.7, convert_system_message_to_human=True)
     else:
         click.secho(f"🚫 Unsupported model: {model}", fg="red", bold=True)
         return
@@ -98,21 +117,26 @@ def generate_message(description, commit, template, add, model):
 
     if not template:
         template = get_commit_template()
-    system_message: str = ""
+    system_message = ""
     if template:
         system_message += default_system_message
         system_message += adding_template
         system_message += template
 
     if explanation:
-        diff = build_user_message(explanation, formatted_diff)
+        diff_message = build_user_message(explanation, formatted_diff)
+    else:
+        diff_message = formatted_diff
 
-    input_message = f"{system_message}\n\n{diff}"
+    input_message = f"{system_message}\n\n{diff_message}"
+
     click.secho(
         "\n\n🧠 Analyzing the changes and generating a commit message...\n\n",
         fg="blue",
         bold=True,
-    ),
+    )
+
+    # Invoke the model
     ai_message = llm.invoke(input=input_message)
     commit_message = ai_message.content
 
