@@ -1,0 +1,100 @@
+# File: pyproject.toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "commitai"
+version = "0.3.0"
+description = "Commitai helps you generate git commit messages using AI"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Luis Guilherme", email = "lgpelin92@gmail.com" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "click>=8.0,<9.0",
+    "langchain>=0.1.0,<0.3.0",
+    "langchain-core>=0.1.0,<0.3.0",
+    "langchain-community>=0.0.20,<0.2.0",
+    "langchain-anthropic>=0.1.0,<0.3.0",
+    "langchain-openai>=0.1.0,<0.3.0",
+    "langchain-google-genai~=0.0.9",
+    "pydantic>=2.0,<3.0",
+]
+
+[project.urls]
+"Bug Tracker" = "https://github.com/lguibr/commitai/issues"
+"Documentation" = "https://github.com/lguibr/commitai/blob/main/README.md"
+"Source Code" = "https://github.com/lguibr/commitai"
+
+[project.scripts]
+commitai = "commitai.cli:commitai_alias"
+commitai-create-template = "commitai.cli:commitai_create_template_alias"
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=3.0",
+    "mypy>=1.9.0",
+    "types-setuptools",
+    "ruff>=0.3.0",
+    "langchain-google-genai~=0.0.9",
+]
+
+[tool.hatch.version]
+path = "commitai/__init__.py"
+
+[tool.ruff]
+line-length = 88
+target-version = "py38"
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "C", "B", "C90", "B904", "C4", # Added B904, C4
+]
+ignore = ["E501"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+files = ["commitai", "commitai/tests"]
+# Ignore specific error codes globally for now
+# Ideally, scope these with [[tool.mypy.overrides]] if possible later
+disable_error_code = ["arg-type", "call-arg"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --cov=commitai --cov-report=term-missing --cov-report=xml"
+testpaths = [
+    "commitai/tests",
+]
+[tool.coverage.report]
+fail_under = 95
+show_missing = true

@@ -20,7 +20,6 @@ default_system_message = (
 adding_template = " The message should follow this template: "
 
 
-
 def build_user_message(explanation, diff):
     return (
         f"Here is a high-level explanation of the commit: {explanation}" f"\n\n{diff}"

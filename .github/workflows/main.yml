@@ -1,125 +1,93 @@
-name: CI
+# File: .github/workflows/main.yml
+name: CI and Publish
 
+# Trigger on pushes/PRs to main AND pushes of tags starting with 'v'
 on:
   push:
-    branches: [main]
+    branches: [ "main" ]
+    tags:
+      - 'v*' # Trigger on tags like v0.1.0, v1.2.3, etc.
   pull_request:
-    branches: [main]
+    branches: [ "main" ]
 
 jobs:
-  lint:
+  # Job 1: Run linters, type checks, and tests
+  test_and_lint:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.x
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install flake8
-      - name: Lint with flake8
-        run: |
-          flake8 .
+    strategy:
+      fail-fast: false
+      matrix:
+        # Test on min, max, and one intermediate Python version
+        python-version: ["3.8", "3.10", "3.12"]
 
-  type-check:
-    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.x
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install mypy
-          pip install -r requirements.txt\
-      - name: Type check with mypy
-        run: |
-          mypy .
+    - name: Check out code
+      uses: actions/checkout@v4
 
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.x
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-cov
-      - name: Install commitai package
-        run: |
-          pip install -e .
-      - name: Run tests with coverage
-        run: |
-          pytest --cov=commitai -vv
-      - name: Generate coverage report
-        run: |
-          coverage report -m
-          coverage xml
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4.0.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          slug: lguibr/commitai
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: true
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip' # Cache pip dependencies
 
-  bump-version:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [lint, type-check, test]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Bump version
-        id: bump_version
-        run: |
-          git config --global user.email "action@github.com"
-          git config --global user.name "GitHub Action"
-          current_version=$(grep -oP 'version="\K[^"]+' setup.py)
-          major=$(echo $current_version | cut -d '.' -f 1)
-          minor=$(echo $current_version | cut -d '.' -f 2)
-          patch=$(echo $current_version | cut -d '.' -f 3)
-          new_version="$major.$minor.$((patch + 1))"
-          sed -i "s/version=\"$current_version\"/version=\"$new_version\"/g" setup.py
-          git add setup.py
-          git commit -m "Bump version to $new_version"
-          git push
-          echo "new_version=$new_version" >> $GITHUB_OUTPUT
-    outputs:
-      new_version: ${{ steps.bump_version.outputs.new_version }}
+    - name: Install dependencies (including test extras)
+      run: |
+        python -m pip install --upgrade pip
+        # Install the package with the 'test' extras defined in pyproject.toml
+        pip install .[test]
 
-  release:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [bump-version]
+    - name: Lint and Format Check with Ruff
+      run: |
+        ruff format --check .
+        ruff check .
+
+    - name: Analyse code with Mypy
+      run: |
+        # Run mypy on the source and tests directories
+        mypy commitai commitai/tests
+
+    - name: Run tests with Pytest and Coverage
+      run: |
+        pytest # Pytest options are configured in pyproject.toml
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }} # Optional: if repo is private
+        slug: lguibr/commitai
+        fail_ci_if_error: true
+
+  # Job 2: Publish package to PyPI on tagged commits
+  publish:
+    # Only run this job if the trigger was a tag push starting with 'v'
+    if: startsWith(github.ref, 'refs/tags/v')
+    # Only run this job if the 'test_and_lint' job succeeded (on all Python versions)
+    needs: test_and_lint
     runs-on: ubuntu-latest
+
+    # Grant permissions for GitHub's OIDC token to be used for PyPI Trusted Publishing
+    permissions:
+      id-token: write # Essential for Trusted Publishing
+
     steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: main
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.x
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install setuptools wheel twine
-      - name: Build package
-        run: python setup.py sdist bdist_wheel
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Python for publishing
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11' # Use a consistent Python version for building
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine # Tools needed to build and upload the package
+
+    - name: Build package
+      run: python -m build # Creates wheel and sdist in dist/ directory
+
+    - name: Publish package to PyPI
+      # Twine will automatically use the OIDC token provided by the runner environment
+      # when run in a job with 'id-token: write' permissions.
+      # Ensure you have configured Trusted Publishing on PyPI for this repo/workflow.
+      run: twine upload dist/*

@@ -1,8 +1,0 @@
-click
-langchain-anthropic
-langchain-openai
-langchain
-langchain-community
-setuptools
-types-setuptools
-langchain-google-genai

@@ -1,34 +1,41 @@
+
+# File: .pre-commit-config.yaml
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v4.6.0 # Use a recent version
     hooks:
       - id: check-yaml
       - id: end-of-file-fixer
       - id: trailing-whitespace
-        args: [--markdown-linebreak-ext=md]
-      - id: debug-statements
-      - id: fix-encoding-pragma
+      - id: check-added-large-files
 
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version. Must be aligned with the version in pyproject.toml
+    rev: v0.4.4 # Choose a specific Ruff version
     hooks:
-      - id: isort
-        name: isort (python)
-        args: ["--settings-path", ".isort.cfg"]
-
-  - repo: https://github.com/psf/black
-    rev: 24.2.0
-    hooks:
-      - id: black
-        language_version: python3.11
-
-  - repo: https://github.com/PyCQA/flake8
-    rev: 7.0.0
-    hooks:
-      - id: flake8
+      # Run the linter.
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix] # Auto-fix and fail if fixes were made
+      # Run the formatter.
+      - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.9.0
+    rev: v1.10.0 # Use a recent version of mypy mirror
     hooks:
       - id: mypy
-        additional_dependencies: [types-all]
+        # Ensure mypy runs with the necessary dependencies installed
+        additional_dependencies: [
+            "click>=8.0,<9.0",
+            "langchain>=0.1.0,<0.3.0",
+            "langchain-community>=0.0.20,<0.2.0",
+            "langchain-anthropic>=0.1.0,<0.3.0",
+            "langchain-openai>=0.1.0,<0.3.0",
+            "langchain-google-genai~=0.0.9",
+            "pydantic>=2.0,<3.0",
+            "types-setuptools"
+        ]
+        args: [--config-file=pyproject.toml] # Point mypy to the config
+        # You might need to adjust entry if your structure changes
+        # entry: mypy commitai commitai/tests
