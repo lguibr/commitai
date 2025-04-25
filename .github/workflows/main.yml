@@ -15,7 +15,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Updated Python versions: min supported, intermediate, latest stable
         python-version: ["3.9", "3.11", "3.12"]
 
     steps:
@@ -31,7 +30,6 @@ jobs:
     - name: Install dependencies (including test extras)
       run: |
         python -m pip install --upgrade pip
-        # Ensure coverage is installed via test extras
         pip install .[test]
 
     - name: Lint and Format Check with Ruff
@@ -41,32 +39,28 @@ jobs:
 
     - name: Analyse code with Mypy
       run: |
-        # Scan source and the new top-level tests directory
         mypy commitai tests
 
     - name: Run tests via Coverage
       run: |
-        # Run pytest via coverage run for better control
-        # Use coverage config from pyproject.toml (source, branch, omit)
         coverage run --rcfile=pyproject.toml -m pytest tests/
 
     - name: Generate Coverage Report (XML)
       run: |
-        # Generate the XML report for Codecov
         coverage xml -o coverage.xml
 
     - name: Check Coverage Threshold
       run: |
-        # Check coverage percentage against the threshold defined in pyproject.toml
-        # Use --fail-under from the config file
-        coverage report --rcfile=pyproject.toml --fail-under=$(grep 'fail_under' pyproject.toml | sed 's/.*= *//')
+        # Extract the real fail_under value (ignore comments) and enforce it
+        FAIL_UNDER=$(grep -E '^\s*fail_under\s*=' pyproject.toml \
+                     | sed 's/.*= *//')
+        coverage report --rcfile=pyproject.toml --fail-under=$FAIL_UNDER
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4
       with:
-        token: ${{ secrets.CODECOV_TOKEN }} # Optional: if repo is private
+        token: ${{ secrets.CODECOV_TOKEN }}
         slug: lguibr/commitai
-        # Explicitly tell Codecov where to find the coverage report
         files: ./coverage.xml
         fail_ci_if_error: true
 
@@ -75,7 +69,6 @@ jobs:
     needs: test_and_lint
     runs-on: ubuntu-latest
     permissions:
-      # Required for trusted publishing to PyPI
       id-token: write
 
     steps:
@@ -96,5 +89,4 @@ jobs:
       run: python -m build
 
     - name: Publish package to PyPI using trusted publisher
-      uses: pypa/gh-action-pypi-publish@release/v1
-      # No API token needed due to trusted publishing
+      uses: pypa/gh-action-pypi-publish@release/v1 
