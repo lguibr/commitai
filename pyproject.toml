@@ -100,9 +100,8 @@ disable_error_code = ["arg-type", "call-arg"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-# Explicitly specify coverage source via pyproject.toml [tool.coverage.run]
-# Keep --cov=commitai here as it enables coverage collection via pytest-cov
-addopts = "-ra -q --cov=commitai --cov-report=term-missing --cov-report=xml --cov-fail-under=85"
+# Coverage source is specified via pyproject.toml [tool.coverage.run]
+addopts = "-ra -q --cov-report=term-missing --cov-report=xml --cov-fail-under=85"
 # Point to the new top-level tests directory
 testpaths = [
     "tests",

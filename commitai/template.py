@@ -15,6 +15,7 @@ default_system_message = (
     "Avoid generic messages like 'update', 'fix bugs', or 'improve code'."
     "Focus on the specific changes made and their impact."
     "Don't wrap the text in the commit message, or anything like that this text is a commit message directed sent to the user editor in commit process"
+    "Don't include codeblock on the response as ``` or anything like that we need raw git message as raw txt"
 )
 
 adding_template = " The message should follow this template: "
