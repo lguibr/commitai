@@ -7,6 +7,10 @@
 [![License](https://img.shields.io/pypi/l/CommitAi.svg)](https://github.com/lguibr/CommitAi/blob/main/LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
+<p align="center">
+  <img src="bitmap.png" alt="Logo" width="300"/>
+</p>
+
 **Tired of writing Git commit messages? Let AI do the heavy lifting!**
 
 **CommitAi** streamlines your Git workflow by leveraging powerful AI models (OpenAI's GPT, Anthropic's Claude, Google's Gemini) to automatically generate clear, concise, and conventional commit messages based on your staged changes.
