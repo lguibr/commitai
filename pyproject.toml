@@ -100,9 +100,8 @@ disable_error_code = ["arg-type", "call-arg"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-# Coverage source is specified via pyproject.toml [tool.coverage.run]
-# Removed --cov=commitai from here
-addopts = "-ra -q --cov-report=term-missing --cov-report=xml --cov-fail-under=85"
+# Keep addopts minimal; coverage flags are now explicit in the CI command
+addopts = "-ra -q"
 # Point to the new top-level tests directory
 testpaths = [
     "tests",
@@ -117,6 +116,6 @@ branch = true
 omit = ["tests/*"]
 
 [tool.coverage.report]
-# Align fail_under with the value in addopts
-fail_under = 85
+# This fail_under is used for local runs if not overridden by command line
+fail_under = 95
 show_missing = true

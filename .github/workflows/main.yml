@@ -45,9 +45,8 @@ jobs:
 
     - name: Run tests with Pytest and Coverage
       run: |
-        # Run pytest; rely on pyproject.toml for coverage source config.
-        # Keep report/fail flags explicit here.
-        pytest --cov-report=xml --cov-report=term-missing --cov-fail-under=85 tests/
+        # Explicitly run pytest with all coverage flags to ensure report generation
+        pytest --cov=commitai --cov-branch --cov-report=xml --cov-report=term-missing --cov-fail-under=85 tests/
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4
