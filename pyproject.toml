@@ -1,4 +1,4 @@
-
+# File: pyproject.toml
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -101,6 +101,7 @@ disable_error_code = ["arg-type", "call-arg"]
 [tool.pytest.ini_options]
 minversion = "7.0"
 # Coverage source is specified via pyproject.toml [tool.coverage.run]
+# Removed --cov=commitai from here
 addopts = "-ra -q --cov-report=term-missing --cov-report=xml --cov-fail-under=85"
 # Point to the new top-level tests directory
 testpaths = [
@@ -110,6 +111,8 @@ testpaths = [
 [tool.coverage.run]
 # Explicitly tell coverage where the source code is
 source = ["commitai"]
+# Enable branch coverage
+branch = true
 # Omit test files from coverage measurement itself
 omit = ["tests/*"]
 

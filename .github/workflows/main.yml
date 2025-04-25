@@ -45,8 +45,9 @@ jobs:
 
     - name: Run tests with Pytest and Coverage
       run: |
-        # Explicitly run pytest with coverage flags to ensure report generation
-        pytest --cov=commitai --cov-report=xml --cov-report=term-missing --cov-fail-under=85 tests/
+        # Run pytest; rely on pyproject.toml for coverage source config.
+        # Keep report/fail flags explicit here.
+        pytest --cov-report=xml --cov-report=term-missing --cov-fail-under=85 tests/
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4
@@ -84,3 +85,4 @@ jobs:
 
     - name: Publish package to PyPI using trusted publisher
       uses: pypa/gh-action-pypi-publish@release/v1
+      # No API token needed due to trusted publishing
