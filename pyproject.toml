@@ -8,7 +8,7 @@ name = "commitai"
 version = "0.3.0"
 description = "Commitai helps you generate git commit messages using AI"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9" # Updated minimum Python version
 license = { file = "LICENSE" }
 authors = [
     { name = "Luis Guilherme", email = "lgpelin92@gmail.com" },
@@ -19,7 +19,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
+    # Removed 3.8
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -62,11 +62,11 @@ path = "commitai/__init__.py"
 
 [tool.ruff]
 line-length = 88
-target-version = "py38"
+target-version = "py39" # Updated target version for Ruff
 
 [tool.ruff.lint]
 select = [
-    "E", "W", "F", "I", "C", "B", "C90", "B904", "C4", # Added B904, C4
+    "E", "W", "F", "I", "C", "B", "C90", "B904", "C4",
 ]
 ignore = ["E501"]
 
@@ -80,21 +80,20 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
 files = ["commitai", "commitai/tests"]
-# Ignore specific error codes globally for now
-# Ideally, scope these with [[tool.mypy.overrides]] if possible later
 disable_error_code = ["arg-type", "call-arg"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-ra -q --cov=commitai --cov-report=term-missing --cov-report=xml"
+addopts = "-ra -q --cov=commitai --cov-report=term-missing --cov-report=xml --cov-fail-under=85"
 testpaths = [
     "commitai/tests",
 ]
+
 [tool.coverage.report]
 fail_under = 95
 show_missing = true

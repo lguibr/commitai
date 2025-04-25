@@ -27,33 +27,36 @@ def mock_generate_deps(tmp_path):
 
     mock_file_open_patch = patch("builtins.open", mock_open())
 
-    with patch(
-        "commitai.cli.ChatGoogleGenerativeAI",
-        spec=ActualChatGoogleGenerativeAI,
-        create=True,
-    ) as mock_google_class_in_cli, patch(
-        "commitai.cli.ChatOpenAI", spec=ChatOpenAI
-    ) as mock_openai_class, patch(
-        "commitai.cli.ChatAnthropic", spec=ChatAnthropic
-    ) as mock_anthropic_class, patch(
-        "commitai.cli.stage_all_changes"
-    ) as mock_stage, patch(
-        "commitai.cli.run_pre_commit_hook", return_value=True
-    ) as mock_hook, patch(
-        "commitai.cli.get_staged_changes_diff", return_value="Staged changes diff"
-    ) as mock_diff, patch(
-        "commitai.cli.get_repository_name", return_value=str(fake_repo_path)
-    ) as mock_repo, patch(
-        "commitai.cli.get_current_branch_name", return_value="main"
-    ) as mock_branch, patch("commitai.cli.create_commit") as mock_commit, patch(
-        "click.edit"
-    ) as mock_edit, patch("click.clear"), patch(
-        "commitai.cli._get_google_api_key", return_value="fake_google_key"
-    ) as mock_get_google_key, patch("os.getenv") as mock_getenv, patch(
-        "os.makedirs"
-    ) as mock_makedirs, mock_file_open_patch as mock_builtin_open, patch(
-        "os.path.exists"
-    ) as mock_path_exists:  # Mock os.path.exists
+    with (
+        patch(
+            "commitai.cli.ChatGoogleGenerativeAI",
+            spec=ActualChatGoogleGenerativeAI,
+            create=True,
+        ) as mock_google_class_in_cli,
+        patch("commitai.cli.ChatOpenAI", spec=ChatOpenAI) as mock_openai_class,
+        patch("commitai.cli.ChatAnthropic", spec=ChatAnthropic) as mock_anthropic_class,
+        patch("commitai.cli.stage_all_changes") as mock_stage,
+        patch("commitai.cli.run_pre_commit_hook", return_value=True) as mock_hook,
+        patch(
+            "commitai.cli.get_staged_changes_diff", return_value="Staged changes diff"
+        ) as mock_diff,
+        patch(
+            "commitai.cli.get_repository_name", return_value=str(fake_repo_path)
+        ) as mock_repo,
+        patch(
+            "commitai.cli.get_current_branch_name", return_value="main"
+        ) as mock_branch,
+        patch("commitai.cli.create_commit") as mock_commit,
+        patch("click.edit") as mock_edit,
+        patch("click.clear"),
+        patch(
+            "commitai.cli._get_google_api_key", return_value="fake_google_key"
+        ) as mock_get_google_key,
+        patch("os.getenv") as mock_getenv,
+        patch("os.makedirs") as mock_makedirs,
+        mock_file_open_patch as mock_builtin_open,
+        patch("os.path.exists") as mock_path_exists,
+    ):  # Mock os.path.exists
         mock_path_exists.return_value = False
 
         mock_openai_instance = mock_openai_class.return_value
