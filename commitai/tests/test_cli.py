@@ -389,7 +389,7 @@ def test_generate_with_global_template(mock_generate_deps):
 # Patch get_commit_template directly for this test
 @patch("commitai.cli.get_commit_template")
 def test_generate_with_local_template(mock_get_template, mock_generate_deps):
-    """Test generate command with a local template file by mocking get_commit_template."""
+    """Test generate command local template file by mocking get_commit_template."""
     runner = CliRunner()
     local_template_content = "Local Template Instruction."
     # Configure the mock to return the local template content

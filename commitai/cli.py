@@ -57,7 +57,7 @@ def _initialize_llm(model: str) -> BaseChatModel:
                     "Error: OPENAI_API_KEY environment variable not set."
                 )
             # Pass raw string and ignore Mypy SecretStr complaint
-            return ChatOpenAI(model=model, api_key=api_key, temperature=0.7)  # type: ignore[arg-type]
+            return ChatOpenAI(model=model, api_key=api_key, temperature=0.7)
         elif model.startswith("claude-"):
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
@@ -66,19 +66,22 @@ def _initialize_llm(model: str) -> BaseChatModel:
                 )
             # Pass raw string and ignore Mypy SecretStr complaint
             # Also ignore missing timeout argument if it's optional
-            return ChatAnthropic(model_name=model, api_key=api_key, temperature=0.7)  # type: ignore[arg-type, call-arg]
+            return ChatAnthropic(model_name=model, api_key=api_key, temperature=0.7)
         elif model.startswith("gemini-"):
             if ChatGoogleGenerativeAI is None:
                 raise click.ClickException(
-                    "Error: 'langchain-google-genai' is not installed. Run 'pip install commitai[test]' or 'pip install langchain-google-genai'"
+                    "Error: 'langchain-google-genai' is not installed. "
+                    "Run 'pip install commitai[test]' or "
+                    "'pip install langchain-google-genai'"
                 )
             if not google_api_key_str:
                 raise click.ClickException(
-                    "Error: Google API Key not found. Set GOOGLE_API_KEY, GEMINI_API_KEY, or GOOGLE_GENERATIVE_AI_API_KEY."
+                    "Error: Google API Key not found. Set GOOGLE_API_KEY, "
+                    "GEMINI_API_KEY, or GOOGLE_GENERATIVE_AI_API_KEY."
                 )
             # Pass raw string and ignore Mypy SecretStr complaint
             # Also ignore missing optional arguments
-            return ChatGoogleGenerativeAI(  # type: ignore[arg-type, call-arg]
+            return ChatGoogleGenerativeAI(
                 model=model,
                 google_api_key=google_api_key_str,
                 temperature=0.7,
@@ -92,7 +95,14 @@ def _initialize_llm(model: str) -> BaseChatModel:
 
 # Helper function to prepare context (diff, repo, branch)
 def _prepare_context() -> str:
-    """Gets the repository context (name, branch, diff). Returns diff string or raises ClickException."""
+    """
+    Gets the repository context (name, branch, diff).
+
+    Returns:
+        str: The formatted diff string.
+    Raises:
+        click.ClickException: If no staged changes are found.
+    """
     diff = get_staged_changes_diff()
     if not diff:
         raise click.ClickException("⚠️ Warning: No staged changes found. Exiting.")
@@ -122,7 +132,12 @@ def _build_prompt(
 
 # Helper function to handle commit message editing and creation
 def _handle_commit(commit_message: str, commit_flag: bool) -> None:
-    """Writes message, optionally opens editor, and creates the commit. Raises ClickException on failure."""
+    """
+    Writes message, optionally opens editor, and creates the commit.
+
+    Raises:
+        click.ClickException: On file I/O errors or if the commit is aborted.
+    """
     repo_path = get_repository_name()
     git_dir = os.path.join(repo_path, ".git")
     try:
@@ -181,7 +196,9 @@ def cli() -> None:
     "--template",
     "-t",
     default=None,
-    help="Specify a commit message template (DEPRECATED: Use env var or create-template)",
+    help=(
+        "Specify a commit message template (DEPRECATED: Use env var or create-template)"
+    ),
 )
 @click.option(
     "--add",
@@ -194,8 +211,10 @@ def cli() -> None:
     "-m",
     default="gemini-2.5-pro-preview-03-25",
     help=(
-        "Set the engine model (e.g., 'gpt-4', 'claude-3-opus-20240229', 'gemini-2.5-pro-preview-03-25'). "
-        "Ensure API key env var is set (OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY/GEMINI_API_KEY/GOOGLE_GENERATIVE_AI_API_KEY)."
+        "Set the engine model (e.g., 'gpt-4', 'claude-3-opus-20240229', "
+        "'gemini-2.5-pro-preview-03-25'). Ensure API key env var is set "
+        "(OPENAI_API_KEY, ANTHROPIC_API_KEY, "
+        "GOOGLE_API_KEY/GEMINI_API_KEY/GOOGLE_GENERATIVE_AI_API_KEY)."
     ),
 )
 def generate_message(
@@ -225,7 +244,8 @@ def generate_message(
 
     if template:
         click.secho(
-            "⚠️ Warning: The --template/-t option is deprecated. Use environment variable TEMPLATE_COMMIT or `commitai-create-template` command.",
+            "⚠️ Warning: The --template/-t option is deprecated. Use environment "
+            "variable TEMPLATE_COMMIT or `commitai-create-template` command.",
             fg="yellow",
         )
     final_template = template or get_commit_template()
