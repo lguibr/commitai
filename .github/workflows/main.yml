@@ -40,7 +40,8 @@ jobs:
 
     - name: Analyse code with Mypy
       run: |
-        mypy commitai commitai/tests
+        # Scan only the main package; mypy will find tests inside
+        mypy commitai
 
     - name: Run tests with Pytest and Coverage
       run: |

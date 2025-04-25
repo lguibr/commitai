@@ -93,7 +93,8 @@ python_version = "3.9" # Consistent with requires-python
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
-files = ["commitai", "commitai/tests"]
+# Scan only the main package; mypy will find tests inside
+files = ["commitai"]
 disable_error_code = ["arg-type", "call-arg"]
 
 [tool.pytest.ini_options]
