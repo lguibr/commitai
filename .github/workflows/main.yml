@@ -52,6 +52,8 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }} # Optional: if repo is private
         slug: lguibr/commitai
+        # Explicitly tell Codecov where to find the coverage report
+        files: ./coverage.xml
         fail_ci_if_error: true
 
   publish:
@@ -59,6 +61,7 @@ jobs:
     needs: test_and_lint
     runs-on: ubuntu-latest
     permissions:
+      # Required for trusted publishing to PyPI
       id-token: write
 
     steps:
@@ -78,5 +81,5 @@ jobs:
     - name: Build package
       run: python -m build
 
-    - name: Publish package to PyPI
-      run: twine upload dist/*
+    - name: Publish package to PyPI using trusted publisher
+      uses: pypa/gh-action-pypi-publish@release/v1
