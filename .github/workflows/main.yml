@@ -88,5 +88,8 @@ jobs:
     - name: Build package
       run: python -m build
 
-    - name: Publish package to PyPI using trusted publisher
-      uses: pypa/gh-action-pypi-publish@v1
+    - name: Publish package to PyPI
+      # Twine will automatically use the OIDC token provided by the runner environment
+      # when run in a job with 'id-token: write' permissions.
+      # Ensure you have configured Trusted Publishing on PyPI for this repo/workflow.
+      run: twine upload dist/*
