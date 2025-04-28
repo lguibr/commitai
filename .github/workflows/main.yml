@@ -89,4 +89,4 @@ jobs:
       run: python -m build
 
     - name: Publish package to PyPI using trusted publisher
-      uses: pypa/gh-action-pypi-publish@release/v1 
+      uses: pypa/gh-action-pypi-publish@v1
