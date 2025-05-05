@@ -6,7 +6,9 @@ build-backend = "hatchling.build"
 [project]
 name = "commitai"
 # Make sure to update version in commitai/__init__.py as well
-version = "1.0.4" # Assuming version was bumped, adjust if needed
+
+version = "1.0.5"
+
 description = "Commitai helps you generate git commit messages using AI"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -29,12 +31,13 @@ classifiers = [
 ]
 dependencies = [
     "click>=8.0,<9.0",
-    "langchain>=0.1.0,<0.3.0",
-    "langchain-core>=0.1.0,<0.3.0",
-    "langchain-community>=0.0.20,<0.2.0",
-    "langchain-anthropic>=0.1.0,<0.3.0",
-    "langchain-openai>=0.1.0,<0.3.0",
-    "langchain-google-genai~=0.0.9",
+    "langchain>=0.1.0,<=0.3.25",
+    "langchain-core>=0.1.0,<=0.3.58",
+    "langchain-community>=0.0.20,<=0.3.23",
+    "langchain-anthropic>=0.1.0,<=0.3.12",
+    "langchain-openai>=0.1.0,<=0.3.16",
+    "langchain-google-genai~=2.1.4",
+    "langchain-ollama~=0.3.2",
     "pydantic>=2.0,<3.0",
 ]
 
@@ -55,7 +58,7 @@ test = [
     "types-setuptools",
     # Pin ruff version to match pre-commit hook
     "ruff==0.4.4",
-    "langchain-google-genai~=0.0.9", # Keep google genai here for mypy in pre-commit
+    "langchain-google-genai~=2.1.4", # Keep google genai here for mypy in pre-commit
 ]
 
 [tool.hatch.version]
