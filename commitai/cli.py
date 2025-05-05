@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-from typing import Optional, Tuple
+from typing import Optional, Tuple, cast
 
 import click
 from langchain_anthropic import ChatAnthropic
@@ -35,7 +35,6 @@ from commitai.template import (
 )
 
 
-# Helper function to get API key with priority
 def _get_google_api_key() -> Optional[str]:
     """Gets the Google API key from environment variables in priority order."""
     return (
@@ -45,7 +44,6 @@ def _get_google_api_key() -> Optional[str]:
     )
 
 
-# Helper function to initialize the LLM
 def _initialize_llm(model: str) -> BaseChatModel:
     """Initializes and returns the LangChain chat model based on the model name."""
     google_api_key_str = _get_google_api_key()
@@ -57,17 +55,16 @@ def _initialize_llm(model: str) -> BaseChatModel:
                 raise click.ClickException(
                     "Error: OPENAI_API_KEY environment variable not set."
                 )
-            # Pass raw string and ignore Mypy SecretStr complaint
             return ChatOpenAI(model=model, api_key=api_key, temperature=0.7)
+
         elif model.startswith("claude-"):
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
                 raise click.ClickException(
                     "Error: ANTHROPIC_API_KEY environment variable not set."
                 )
-            # Pass raw string and ignore Mypy SecretStr complaint
-            # Also ignore missing timeout argument if it's optional
             return ChatAnthropic(model_name=model, api_key=api_key, temperature=0.7)
+
         elif model.startswith("gemini-"):
             if ChatGoogleGenerativeAI is None:
                 raise click.ClickException(
@@ -80,30 +77,23 @@ def _initialize_llm(model: str) -> BaseChatModel:
                     "Error: Google API Key not found. Set GOOGLE_API_KEY, "
                     "GEMINI_API_KEY, or GOOGLE_GENERATIVE_AI_API_KEY."
                 )
-            # Pass raw string and ignore Mypy SecretStr complaint
-            # Also ignore missing optional arguments
             return ChatGoogleGenerativeAI(
                 model=model,
                 google_api_key=google_api_key_str,
                 temperature=0.7,
                 convert_system_message_to_human=True,
             )
+        elif model.startswith("llama"):
+            # Ollama models (e.g., llama2, llama3)
+            return cast(BaseChatModel, ChatOllama(model=model, temperature=0.7))
         else:
-            return ChatOllama(model=model, temperature=0.7)
+            raise click.ClickException(f"🚫 Unsupported model: {model}")
+
     except Exception as e:
         raise click.ClickException(f"Error initializing AI model: {e}") from e
 
 
-# Helper function to prepare context (diff, repo, branch)
 def _prepare_context() -> str:
-    """
-    Gets the repository context (name, branch, diff).
-
-    Returns:
-        str: The formatted diff string.
-    Raises:
-        click.ClickException: If no staged changes are found.
-    """
     diff = get_staged_changes_diff()
     if not diff:
         raise click.ClickException("⚠️ Warning: No staged changes found. Exiting.")
@@ -113,11 +103,9 @@ def _prepare_context() -> str:
     return f"{repo_name}/{branch_name}\n\n{diff}"
 
 
-# Helper function to build the final prompt
 def _build_prompt(
     explanation: str, formatted_diff: str, template: Optional[str]
 ) -> str:
-    """Builds the complete prompt for the AI model."""
     system_message = default_system_message
     if template:
         system_message += adding_template
@@ -131,14 +119,7 @@ def _build_prompt(
     return f"{system_message}\n\n{diff_message}"
 
 
-# Helper function to handle commit message editing and creation
 def _handle_commit(commit_message: str, commit_flag: bool) -> None:
-    """
-    Writes message, optionally opens editor, and creates the commit.
-
-    Raises:
-        click.ClickException: On file I/O errors or if the commit is aborted.
-    """
     repo_path = get_repository_name()
     git_dir = os.path.join(repo_path, ".git")
     try:
@@ -181,7 +162,6 @@ def _handle_commit(commit_message: str, commit_flag: bool) -> None:
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 def cli() -> None:
-    """CommitAi CLI group."""
     pass
 
 
@@ -225,7 +205,6 @@ def generate_message(
     add: bool,
     model: str,
 ) -> None:
-    """Generates a commit message based on staged changes and description."""
     explanation = " ".join(description)
 
     llm = _initialize_llm(model)
