@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 import click
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
 # Keep SecretStr import in case it's needed elsewhere or for future refinement
@@ -88,7 +89,7 @@ def _initialize_llm(model: str) -> BaseChatModel:
                 convert_system_message_to_human=True,
             )
         else:
-            raise click.ClickException(f"🚫 Unsupported model: {model}")
+            return ChatOllama(model=model, temperature=0.7)
     except Exception as e:
         raise click.ClickException(f"Error initializing AI model: {e}") from e
 

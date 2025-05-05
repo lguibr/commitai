@@ -10,6 +10,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import (
     ChatGoogleGenerativeAI as ActualChatGoogleGenerativeAI,
 )
+from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
 from commitai.cli import cli
@@ -35,6 +36,7 @@ def mock_generate_deps(tmp_path):
         ) as mock_google_class_in_cli,
         patch("commitai.cli.ChatOpenAI", spec=ChatOpenAI) as mock_openai_class,
         patch("commitai.cli.ChatAnthropic", spec=ChatAnthropic) as mock_anthropic_class,
+        patch("commitai.cli.ChatOllama", spec=ChatOllama) as mock_ollama_class,
         patch("commitai.cli.stage_all_changes") as mock_stage,
         patch("commitai.cli.run_pre_commit_hook", return_value=True) as mock_hook,
         patch(
@@ -62,17 +64,20 @@ def mock_generate_deps(tmp_path):
         mock_openai_instance = mock_openai_class.return_value
         mock_anthropic_instance = mock_anthropic_class.return_value
         mock_google_instance = mock_google_class_in_cli.return_value
+        mock_ollama_instance = mock_ollama_class.return_value
 
         mock_openai_instance.spec = ChatOpenAI
         mock_anthropic_instance.spec = ChatAnthropic
         if mock_google_class_in_cli is not None:
             mock_google_instance.spec = ActualChatGoogleGenerativeAI
+        mock_ollama_instance.spec = ChatOllama
 
         content_mock = MagicMock()
         content_mock.content = "Generated commit message"
         mock_openai_instance.invoke.return_value = content_mock
         mock_anthropic_instance.invoke.return_value = content_mock
         mock_google_instance.invoke.return_value = content_mock
+        mock_ollama_instance.invoke.return_value = content_mock
 
         def getenv_side_effect(key, default=None):
             if key == "OPENAI_API_KEY":
@@ -81,6 +86,8 @@ def mock_generate_deps(tmp_path):
                 return "fake_anthropic_key"
             if key == "TEMPLATE_COMMIT":
                 return None
+            if key == "OLLAMA_HOST":
+                return "fake_ollama_host"
             return os.environ.get(key, default)
 
         mock_getenv.side_effect = getenv_side_effect
@@ -89,9 +96,11 @@ def mock_generate_deps(tmp_path):
             "openai_class": mock_openai_class,
             "anthropic_class": mock_anthropic_class,
             "google_class": mock_google_class_in_cli,
+            "ollama_class": mock_ollama_class,
             "openai_instance": mock_openai_instance,
             "anthropic_instance": mock_anthropic_instance,
             "google_instance": mock_google_instance,
+            "ollama_instance": mock_ollama_instance,
             "stage": mock_stage,
             "hook": mock_hook,
             "diff": mock_diff,
@@ -183,6 +192,22 @@ def test_generate_select_claude(mock_generate_deps):
         temperature=0.7,
     )
     mock_generate_deps["anthropic_instance"].invoke.assert_called_once()
+    mock_generate_deps["commit"].assert_called_once()
+
+
+def test_generate_select_ollama(mock_generate_deps):
+    """Test selecting ollama model via generate command."""
+    runner = CliRunner()
+    mock_generate_deps[
+        "file_open"
+    ].return_value.read.return_value = "Generated commit message"
+    result = runner.invoke(cli, ["generate", "-m", "llama3", "Test explanation"])
+
+    assert result.exit_code == 0, result.output
+    mock_generate_deps["ollama_class"].assert_called_once_with(
+        model="llama3", temperature=0.7
+    )
+    mock_generate_deps["ollama_instance"].invoke.assert_called_once()
     mock_generate_deps["commit"].assert_called_once()
 
 
@@ -312,18 +337,6 @@ def test_generate_google_key_priority(mock_generate_deps):
         temperature=0.7,
         convert_system_message_to_human=True,
     )
-
-
-def test_generate_unsupported_model(mock_generate_deps):
-    """Test generate command with an unsupported model."""
-    runner = CliRunner()
-    result = runner.invoke(
-        cli, ["generate", "-m", "unsupported-model", "Test explanation"]
-    )
-
-    assert result.exit_code == 1, result.output
-    assert "Unsupported model: unsupported-model" in result.output
-    mock_generate_deps["commit"].assert_not_called()
 
 
 def test_generate_empty_commit_message_aborts(mock_generate_deps):

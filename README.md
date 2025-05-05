@@ -42,7 +42,7 @@ Simply stage your files and run `commitai`. It analyzes the diff, optionally tak
 *   📝 **Optional Explanations**: Provide a high-level description of your changes as input to guide the AI, or let it infer the context solely from the code diff.
 *   ✅ **Pre-commit Hook Integration**: Automatically runs your existing native Git pre-commit hook (`.git/hooks/pre-commit`) before generating the message, ensuring code quality and style checks pass.
 *   🔧 **Customizable Prompts via Templates**: Add custom instructions or context to the AI prompt using global environment variables or repository-specific template files.
-*   🤖 **Multiple AI Provider Support**: Choose your preferred AI model from OpenAI, Anthropic, or Google.
+*   🤖 **Multiple AI Provider Support**: Choose your preferred AI model from OpenAI, Anthropic, Google or local AI models with Ollama.
 *   ⚙️ **Flexible Workflow**:
     *   Stages all changes automatically (`-a` flag).
     *   Reviews message in your default Git editor (default behavior).
@@ -93,6 +93,14 @@ CommitAi requires API keys for the AI provider you intend to use. Set these as e
     ```
 
 You only need to set the key for the provider corresponding to the model you select (or the default, Gemini).
+
+### Ollama
+
+CommitAi can also work with Ollama models:
+```bash
+export OLLAMA_HOST="your_ollama_base_url"
+```
+
 
 ### Commit Templates (Optional)
 
@@ -230,7 +238,7 @@ Contributions are highly welcome! Please follow these steps:
 9.  Run checks locally before committing:
     *   Format code: `ruff format .`
     *   Lint code: `ruff check .`
-    *   Run type checks: `mypy commitai commitai/tests`
+    *   Run type checks: `mypy commitai tests`
     *   Run tests: `pytest`
 10. Commit your changes (you can use `commitai`!).
 11. Push your branch to your fork: `git push origin my-feature-branch`
