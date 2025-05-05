@@ -7,9 +7,13 @@
 [![License](https://img.shields.io/pypi/l/CommitAi.svg)](https://github.com/lguibr/CommitAi/blob/main/LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-<p align="center">
-  <img src="bitmap.png" alt="Logo" width="300"/>
-</p>
+
+<img
+  src="https://raw.githubusercontent.com/lguibr/commitai/main/bitmap.png"
+  alt="screenshot"
+  width="400"
+/>
+
 
 **Tired of writing Git commit messages? Let AI do the heavy lifting!**
 

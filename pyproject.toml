@@ -6,7 +6,9 @@ build-backend = "hatchling.build"
 [project]
 name = "commitai"
 # Make sure to update version in commitai/__init__.py as well
+
 version = "1.0.5"
+
 description = "Commitai helps you generate git commit messages using AI"
 readme = "README.md"
 requires-python = ">=3.9"
