@@ -44,51 +44,48 @@ def _get_google_api_key() -> Optional[str]:
     )
 
 
-def _initialize_llm(model: str) -> BaseChatModel:
+def _initialize_llm(provider: str, model: str) -> BaseChatModel:
     """Initializes and returns the LangChain chat model based on the model name."""
     google_api_key_str = _get_google_api_key()
 
     try:
-        if model.startswith("gpt-"):
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise click.ClickException(
-                    "Error: OPENAI_API_KEY environment variable not set."
+        match provider:
+            case "openai":
+                api_key = os.getenv("OPENAI_API_KEY")
+                if not api_key:
+                    raise click.ClickException(
+                        "Error: OPENAI_API_KEY environment variable not set."
+                    )
+                return ChatOpenAI(model=model, api_key=api_key, temperature=0.7)
+            case "anthropic":
+                api_key = os.getenv("ANTHROPIC_API_KEY")
+                if not api_key:
+                    raise click.ClickException(
+                        "Error: ANTHROPIC_API_KEY environment variable not set."
+                    )
+                return ChatAnthropic(model_name=model, api_key=api_key, temperature=0.7)
+            case "google":
+                if ChatGoogleGenerativeAI is None:
+                    raise click.ClickException(
+                        "Error: 'langchain-google-genai' is not installed. "
+                        "Run 'pip install commitai[test]' or "
+                        "'pip install langchain-google-genai'"
+                    )
+                if not google_api_key_str:
+                    raise click.ClickException(
+                        "Error: Google API Key not found. Set GOOGLE_API_KEY, "
+                        "GEMINI_API_KEY, or GOOGLE_GENERATIVE_AI_API_KEY."
+                    )
+                return ChatGoogleGenerativeAI(
+                    model=model,
+                    google_api_key=google_api_key_str,
+                    temperature=0.7,
+                    convert_system_message_to_human=True,
                 )
-            return ChatOpenAI(model=model, api_key=api_key, temperature=0.7)
-
-        elif model.startswith("claude-"):
-            api_key = os.getenv("ANTHROPIC_API_KEY")
-            if not api_key:
-                raise click.ClickException(
-                    "Error: ANTHROPIC_API_KEY environment variable not set."
-                )
-            return ChatAnthropic(model_name=model, api_key=api_key, temperature=0.7)
-
-        elif model.startswith("gemini-"):
-            if ChatGoogleGenerativeAI is None:
-                raise click.ClickException(
-                    "Error: 'langchain-google-genai' is not installed. "
-                    "Run 'pip install commitai[test]' or "
-                    "'pip install langchain-google-genai'"
-                )
-            if not google_api_key_str:
-                raise click.ClickException(
-                    "Error: Google API Key not found. Set GOOGLE_API_KEY, "
-                    "GEMINI_API_KEY, or GOOGLE_GENERATIVE_AI_API_KEY."
-                )
-            return ChatGoogleGenerativeAI(
-                model=model,
-                google_api_key=google_api_key_str,
-                temperature=0.7,
-                convert_system_message_to_human=True,
-            )
-        elif model.startswith("llama"):
-            # Ollama models (e.g., llama2, llama3)
-            return cast(BaseChatModel, ChatOllama(model=model, temperature=0.7))
-        else:
-            raise click.ClickException(f"🚫 Unsupported model: {model}")
-
+            case "ollama":
+                return cast(BaseChatModel, ChatOllama(model=model, temperature=0.7))
+            case _:
+                raise click.ClickException(f"🚫 Unsupported provider: {provider}.")
     except Exception as e:
         raise click.ClickException(f"Error initializing AI model: {e}") from e
 
@@ -188,8 +185,20 @@ def cli() -> None:
     help="Stage all changes before generating the commit message",
 )
 @click.option(
+    "--provider",
+    "-p",
+    type=click.Choice(["openai", "anthropic", "google", "ollama"]),
+    envvar="LLM_PROVIDER",
+    default="google",
+    help=(
+        "Set the engine model provider"
+        " (e.g., 'openai', 'anthropic', 'google', 'ollama')."
+    ),
+)
+@click.option(
     "--model",
     "-m",
+    envvar="LLM_MODEL",
     default="gemini-2.5-pro-preview-03-25",
     help=(
         "Set the engine model (e.g., 'gpt-4', 'claude-3-opus-20240229', "
@@ -203,11 +212,12 @@ def generate_message(
     commit: bool,
     template: Optional[str],
     add: bool,
+    provider: str,
     model: str,
 ) -> None:
     explanation = " ".join(description)
 
-    llm = _initialize_llm(model)
+    llm = _initialize_llm(provider, model)
 
     if add:
         stage_all_changes()
@@ -284,8 +294,20 @@ def create_template_command(template_content: Tuple[str, ...]) -> None:
     help="Commit the changes with the generated message",
 )
 @click.option(
+    "--provider",
+    "-p",
+    type=click.Choice(["openai", "anthropic", "google", "ollama"]),
+    envvar="LLM_PROVIDER",
+    default="google",
+    help=(
+        "Set the engine model provider"
+        " (e.g., 'openai', 'anthropic', 'google', 'ollama')."
+    ),
+)
+@click.option(
     "--model",
     "-m",
+    envvar="LLM_MODEL",
     default="gemini-2.5-pro-preview-03-25",
     help="Set the engine model to be used.",
 )
