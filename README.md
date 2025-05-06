@@ -163,14 +163,25 @@ The `commitai` command (which is an alias for `commitai generate`) accepts the f
     *   Example: `commitai -c "Fix typo in documentation"` (for minor changes)
     *   Can be combined with `-a`: `commitai -a -c "Quick fix and commit all"`
 
+*   `-p <provider>`, `--provider <provider>`:
+    *   Specifies which LLM provider to use.
+    *   One can use the environment variable `LLM_PROVIDER` instead.
+    *   Defaults to `google`.
+    *   Available options are:
+        * `openai`
+        * `anthropic`
+        * `google`
+        * `ollama`
+
 *   `-m <model_name>`, `--model <model_name>`:
     *   Specifies which AI model to use.
+    *   One can use the environment variable `LLM_MODEL` instead.
     *   Defaults to `gemini-2.5-pro-preview-03-25`.
     *   Ensure the corresponding API key environment variable is set.
     *   Examples:
-        *   `commitai -m gpt-4 "Use OpenAI's GPT-4"`
-        *   `commitai -m claude-3-opus-20240229 "Use Anthropic's Claude 3 Opus"`
-        *   `commitai -m gemini-2.5-flash-preview-04-17 "Use Google's Gemini 1.5 Flash"`
+        *   `commitai -p openai -m gpt-4 "Use OpenAI's GPT-4"`
+        *   `commitai -p anthropic -m claude-3-opus-20240229 "Use Anthropic's Claude 3 Opus"`
+        *   `commitai -p google -m gemini-2.5-flash-preview-04-17 "Use Google's Gemini 1.5 Flash"`
 
 ### Creating Repository Templates
 
@@ -210,7 +221,7 @@ commitai "Implement password reset functionality using email tokens"
 
 ```bash
 # Stage all changes and commit immediately using GPT-4
-commitai -a -c -m gpt-4 "Minor refactoring and cleanup"
+commitai -a -c -p openai -m gpt-4 "Minor refactoring and cleanup"
 ```
 *(Commit is created directly)*
 

@@ -86,6 +86,10 @@ def mock_generate_deps(tmp_path):
                 return "fake_anthropic_key"
             if key == "TEMPLATE_COMMIT":
                 return None
+            if key == "LLM_PROVIDER":
+                return "fake_llm_provider"
+            if key == "LLM_MODEL":
+                return "fake_llm_model"
             if key == "OLLAMA_HOST":
                 return "fake_ollama_host"
             return os.environ.get(key, default)
@@ -165,7 +169,9 @@ def test_generate_select_gpt4(mock_generate_deps):
     mock_generate_deps[
         "file_open"
     ].return_value.read.return_value = "Generated commit message"
-    result = runner.invoke(cli, ["generate", "-m", "gpt-4", "Test explanation"])
+    result = runner.invoke(
+        cli, ["generate", "-p", "openai", "-m", "gpt-4", "Test explanation"]
+    )
 
     assert result.exit_code == 0, result.output
     mock_generate_deps["openai_class"].assert_called_once_with(
@@ -182,7 +188,15 @@ def test_generate_select_claude(mock_generate_deps):
         "file_open"
     ].return_value.read.return_value = "Generated commit message"
     result = runner.invoke(
-        cli, ["generate", "-m", "claude-3-opus-20240229", "Test explanation"]
+        cli,
+        [
+            "generate",
+            "-p",
+            "anthropic",
+            "-m",
+            "claude-3-opus-20240229",
+            "Test explanation",
+        ],
     )
 
     assert result.exit_code == 0, result.output
@@ -201,7 +215,9 @@ def test_generate_select_ollama(mock_generate_deps):
     mock_generate_deps[
         "file_open"
     ].return_value.read.return_value = "Generated commit message"
-    result = runner.invoke(cli, ["generate", "-m", "llama3", "Test explanation"])
+    result = runner.invoke(
+        cli, ["generate", "-p", "ollama", "-m", "llama3", "Test explanation"]
+    )
 
     assert result.exit_code == 0, result.output
     mock_generate_deps["ollama_class"].assert_called_once_with(
@@ -268,7 +284,9 @@ def test_generate_missing_openai_key(mock_generate_deps):
     """Test generate command with missing OpenAI API key."""
     mock_generate_deps["getenv"].side_effect = lambda key, default=None: None
     runner = CliRunner()
-    result = runner.invoke(cli, ["generate", "-m", "gpt-4", "Test explanation"])
+    result = runner.invoke(
+        cli, ["generate", "-p", "openai", "-m", "gpt-4", "Test explanation"]
+    )
 
     assert result.exit_code == 1, result.output
     assert "OPENAI_API_KEY environment variable not set" in result.output
@@ -279,7 +297,9 @@ def test_generate_missing_anthropic_key(mock_generate_deps):
     """Test generate command with missing Anthropic API key."""
     mock_generate_deps["getenv"].side_effect = lambda key, default=None: None
     runner = CliRunner()
-    result = runner.invoke(cli, ["generate", "-m", "claude-3", "Test explanation"])
+    result = runner.invoke(
+        cli, ["generate", "-p", "anthropic", "-m", "claude-3", "Test explanation"]
+    )
 
     assert result.exit_code == 1, result.output
     assert "ANTHROPIC_API_KEY environment variable not set" in result.output
