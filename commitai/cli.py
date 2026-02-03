@@ -66,7 +66,6 @@ def _initialize_llm(model: str) -> BaseChatModel:
         return ChatGoogleGenerativeAI(
             model=model,
             google_api_key=google_api_key_str,
-            convert_system_message_to_human=True,
         )
 
     except Exception as e:
