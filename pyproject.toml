@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 name = "commitai"
 # Make sure to update version in commitai/__init__.py as well
 
-version = "2.0.0"
+version = "2.1.0"
 
 description = "Commitai helps you generate git commit messages using AI"
 readme = "README.md"
@@ -30,10 +30,11 @@ classifiers = [
 ]
 dependencies = [
     "click>=8.1",
-    "langchain>=0.2",
+    "langchain>=1.0",
+    "langchain-community>=0.4.0",
     "langchain-core>=1.0",
-    "langchain-community>=0.2",
     "langchain-google-genai>=1.0",
+    "langgraph>=1.0.0",
     "pydantic>=2.0",
 ]
 

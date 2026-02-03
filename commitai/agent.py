@@ -3,11 +3,11 @@ import os
 import subprocess
 from typing import Any, Dict, Type
 
-from langchain.agents import AgentExecutor, create_tool_calling_agent
+# from langchain.agents import AgentExecutor, create_tool_calling_agent # Removed
 from langchain_core.language_models import BaseChatModel
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
+from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel, Field
 
 # --- TOOLS ---
@@ -157,6 +157,9 @@ class TodoMiddleware:
 # --- AGENT ---
 
 
+# --- AGENT ---
+
+
 def create_commit_agent(llm: BaseChatModel) -> Runnable:
     # 1. Init Tools
     tools = [ReadOnlyShellTool(), FileSearchTool(), FileReadTool()]
@@ -186,18 +189,22 @@ Protocol:
 3. If clarification is needed, explore files.
 4. Final Answer MUST be ONLY the commit message.
 """
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", system_prompt),
-            MessagesPlaceholder("chat_history", optional=True),
-            ("human", "Generate the commit message."),
-            MessagesPlaceholder("agent_scratchpad"),
-        ]
-    )
+    # Note: create_react_agent handles the prompt internally or via state_modifier.
+    # We can pass a system string or a function. Since our prompt depends on dynamic
+    # variables (diff, explanation, etc.), we need to inject them. LangGraph's
+    # prebuilt agent usually takes a static system message. However, we can use the
+    # 'messages' state. But to keep it simple and compatible with existing 'invoke'
+    # interface: We will format the system prompt in the wrapper and pass it as the
+    # first message.
 
-    # 4. Construct Agent
-    agent = create_tool_calling_agent(llm, tools, prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+    # Actually, create_react_agent supports 'state_modifier'.
+    # If we pass a formatted string, it works as system prompt.
+
+    # 4. Construct Graph
+    # We don't construct the graph with ALL variables pre-bound if they change per run.
+    # Instead, we'll format the prompt in the pipeline and pass it to the agent.
+
+    agent_graph = create_react_agent(llm, tools)
 
     # 5. Pipeline with Middleware
     def run_pipeline(inputs: Dict[str, Any]) -> str:
@@ -210,11 +217,34 @@ Protocol:
         state.setdefault("explanation", "None")
         state.setdefault("summary", "None")
         state.setdefault("todo_str", "None")
-        state.setdefault("chat_history", [])
+
+        # Format System Prompt
+        formatted_system_prompt = system_prompt.format(
+            explanation=state["explanation"],
+            todo_str=state["todo_str"],
+            summary=state["summary"],
+            diff=state.get("diff", ""),
+        )
 
         # Run Agent
-        result = agent_executor.invoke(state)
-        return str(result["output"])
+        # LangGraph inputs: {"messages": [{"role": "user", "content": ...}]}
+        # We inject the system prompt as a SystemMessage or just update the state.
+        # create_react_agent primarily looks at 'messages'.
+
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        messages = [
+            SystemMessage(content=formatted_system_prompt),
+            HumanMessage(content="Generate the commit message."),
+        ]
+
+        # Invoke graph
+        # result is a dict with 'messages'
+        result = agent_graph.invoke({"messages": messages})
+
+        # Extract last message content
+        last_message = result["messages"][-1]
+        return str(last_message.content)
 
     # Wrap in RunnableLambda to expose 'invoke'
     from langchain_core.runnables import RunnableLambda

@@ -41,6 +41,7 @@ def mock_generate_deps(tmp_path):
             "commitai.cli.get_current_branch_name", return_value="main"
         ) as mock_branch,
         patch("commitai.cli.create_commit") as mock_commit,
+        # Update mock target for agent creation
         patch("commitai.cli.create_commit_agent") as mock_create_agent,
         patch("click.edit") as mock_edit,
         patch("click.clear"),
@@ -57,10 +58,10 @@ def mock_generate_deps(tmp_path):
 
         mock_google_instance = mock_google_class_in_cli.return_value
 
-        # Agent Mock
-        mock_agent_instance = MagicMock()
-        mock_agent_instance.invoke.return_value = "Generated commit message"
-        mock_create_agent.return_value = mock_agent_instance
+        # Agent Mock (RunnableLambda now)
+        mock_agent_runnable = MagicMock()
+        mock_agent_runnable.invoke.return_value = "Generated commit message"
+        mock_create_agent.return_value = mock_agent_runnable
 
         if mock_google_class_in_cli is not None:
             mock_google_instance.spec = ActualChatGoogleGenerativeAI
@@ -93,7 +94,7 @@ def mock_generate_deps(tmp_path):
             "path_exists": mock_path_exists,
             "commit_msg_path": fake_commit_msg_path,
             "create_agent": mock_create_agent,
-            "agent_instance": mock_agent_instance,
+            "agent_instance": mock_agent_runnable,  # Still useful alias for tests
             "confirm": mock_confirm,
         }
 

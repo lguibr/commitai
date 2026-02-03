@@ -197,7 +197,7 @@ def generate_message(
     template: Optional[str],
     add: bool,
     model: str,
-    deep: bool,
+    deep: bool = False,
 ) -> None:
     explanation = " ".join(description)
 

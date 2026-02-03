@@ -62,17 +62,25 @@ def test_todo_scanner_middleware(mock_llm):
 
 def test_create_commit_agent(mock_llm):
     # This tests the factory function
-    agent_executor = create_commit_agent(mock_llm)
-    assert agent_executor is not None
-    # We can try to invoke it if we mock enough stuff
-    # But just creating it covers the definition lines.
+    # Mocking create_react_agent to avoid actual graph compilation
+    with patch("commitai.agent.create_react_agent") as mock_create_graph:
+        mock_graph = MagicMock()
+        mock_create_graph.return_value = mock_graph
+        agent_executor = create_commit_agent(mock_llm)
+        assert agent_executor is not None
 
 
 def test_agent_run(mock_llm):
     # E2E-ish test of the agent logic with mocks
-    with patch("commitai.agent.AgentExecutor") as MockExecutor:
-        mock_executor_instance = MockExecutor.return_value
-        mock_executor_instance.invoke.return_value = {"output": "Final Commit Message"}
+    with patch("commitai.agent.create_react_agent") as mock_create_graph:
+        mock_graph = MagicMock()
+        mock_create_graph.return_value = mock_graph
+
+        # Determine strict return structure for LangGraph invoke
+        # It yields a dict with "messages" list
+        last_message = MagicMock()
+        last_message.content = "Final Commit Message"
+        mock_graph.invoke.return_value = {"messages": [last_message]}
 
         agent_runnable = create_commit_agent(mock_llm)
         result = agent_runnable.invoke({"diff": "diff", "explanation": "expl"})
