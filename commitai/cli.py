@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import sys
 from typing import Optional, Tuple, cast
 
 import click
@@ -18,6 +19,7 @@ try:
 except ImportError:
     ChatGoogleGenerativeAI = None  # type: ignore
 
+from commitai.agent import create_commit_agent
 from commitai.git import (
     create_commit,
     get_commit_template,
@@ -27,11 +29,6 @@ from commitai.git import (
     run_pre_commit_hook,
     save_commit_template,
     stage_all_changes,
-)
-from commitai.template import (
-    adding_template,
-    build_user_message,
-    default_system_message,
 )
 
 
@@ -100,23 +97,11 @@ def _prepare_context() -> str:
 
     repo_name = get_repository_name()
     branch_name = get_current_branch_name()
+    # Return just the diff for the chain, or context?
+    # The chain prompt expects 'diff'.
+    # Current helper was returning "Repo/Branch\n\nDiff".
+    # Let's keep it to maximize context for the chain.
     return f"{repo_name}/{branch_name}\n\n{diff}"
-
-
-def _build_prompt(
-    explanation: str, formatted_diff: str, template: Optional[str]
-) -> str:
-    system_message = default_system_message
-    if template:
-        system_message += adding_template
-        system_message += template
-
-    if explanation:
-        diff_message = build_user_message(explanation, formatted_diff)
-    else:
-        diff_message = formatted_diff
-
-    return f"{system_message}\n\n{diff_message}"
 
 
 def _handle_commit(commit_message: str, commit_flag: bool) -> None:
@@ -174,6 +159,11 @@ def cli() -> None:
     help="Commit the changes with the generated message",
 )
 @click.option(
+    "--review/--no-review",
+    default=True,
+    help="AI review the diff before generating the commit message (default: enabled)",
+)
+@click.option(
     "--template",
     "-t",
     default=None,
@@ -190,17 +180,17 @@ def cli() -> None:
 @click.option(
     "--model",
     "-m",
-    default="gemini-2.5-pro-preview-03-25",
+    default="gemini-3-flash-preview",
     help=(
-        "Set the engine model (e.g., 'gpt-4', 'claude-3-opus-20240229', "
-        "'gemini-2.5-pro-preview-03-25'). Ensure API key env var is set "
-        "(OPENAI_API_KEY, ANTHROPIC_API_KEY, "
-        "GOOGLE_API_KEY/GEMINI_API_KEY/GOOGLE_GENERATIVE_AI_API_KEY)."
+        "Set the engine model (default: gemini-3-flash-preview). Examples: 'gemini-3-flash-preview', 'gemini-3-pro-preview', "
+        "'gpt-4', 'claude-3-opus'. Ensure API key env var is set "
+        "(OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY/GEMINI_API_KEY/GOOGLE_GENERATIVE_AI_API_KEY)."
     ),
 )
 def generate_message(
     description: Tuple[str, ...],
     commit: bool,
+    review: bool,
     template: Optional[str],
     add: bool,
     model: str,
@@ -222,26 +212,59 @@ def generate_message(
 
     formatted_diff = _prepare_context()
 
+    # Initialize Agent Pipeline
+    agent_pipeline = create_commit_agent(llm)
+
+    # Optional pre-generation review
+    if review:
+        click.secho(
+            "\n\n🔎 Reviewing the staged changes before generating a commit message...\n",
+            fg="blue",
+            bold=True,
+        )
+
+        # Only prompt for confirmation when running in an interactive TTY
+        try:
+            is_interactive = sys.stdin.isatty()
+        except Exception:
+            is_interactive = False
+        if is_interactive:
+            if not click.confirm(
+                "Proceed with generating the commit message?", default=True
+            ):
+                raise click.ClickException("Aborted by user after review.")
+
     if template:
         click.secho(
             "⚠️ Warning: The --template/-t option is deprecated. Use environment "
             "variable TEMPLATE_COMMIT or `commitai-create-template` command.",
             fg="yellow",
         )
-    final_template = template or get_commit_template()
 
-    input_message = _build_prompt(explanation, formatted_diff, final_template)
+    # Check for template from env or file if not provided via CLI (though CLI overrides or is deprecated)
+    # The agent/chain prompt Logic usually handles 'template' variable if passed in input.
+    # We need to fetch the template content if it exists to pass to agent.
+
+    final_template_content = template
+    if not final_template_content:
+        # Check env var or local file
+        final_template_content = os.getenv("TEMPLATE_COMMIT") or get_commit_template()
 
     click.clear()
     click.secho(
-        "\n\n🧠 Analyzing the changes and generating a commit message...\n\n",
+        "\n\n🧠 internal-monologue: Analyzing changes, checking for sensitive data, and summarizing...\n\n",
         fg="blue",
         bold=True,
     )
     try:
         assert llm is not None
-        ai_message = llm.invoke(input=input_message)
-        commit_message = ai_message.content
+        # Invoke the Agent Pipeline
+        inputs = {"diff": formatted_diff, "explanation": explanation}
+        if final_template_content:
+            inputs["template"] = final_template_content
+
+        commit_message = agent_pipeline.invoke(inputs)
+
         if not isinstance(commit_message, str):
             commit_message = str(commit_message)
 
@@ -284,9 +307,14 @@ def create_template_command(template_content: Tuple[str, ...]) -> None:
     help="Commit the changes with the generated message",
 )
 @click.option(
+    "--review/--no-review",
+    default=True,
+    help="AI review the diff before generating the commit message (default: enabled)",
+)
+@click.option(
     "--model",
     "-m",
-    default="gemini-2.5-pro-preview-03-25",
+    default="gpt-5",
     help="Set the engine model to be used.",
 )
 @click.pass_context
@@ -295,11 +323,17 @@ def commitai_alias(
     description: Tuple[str, ...],
     add: bool,
     commit: bool,
+    review: bool,
     model: str,
 ) -> None:
     """Alias for the 'generate' command."""
     ctx.forward(
-        generate_message, description=description, add=add, commit=commit, model=model
+        generate_message,
+        description=description,
+        add=add,
+        commit=commit,
+        review=review,
+        model=model,
     )
 
 

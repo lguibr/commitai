@@ -41,7 +41,7 @@ Simply stage your files and run `commitai`. It analyzes the diff, optionally tak
 
 ## Features
 
-*   🧠 **Intelligent Commit Generation**: Analyzes staged code differences (`git diff --staged`) using state-of-the-art AI models (GPT, Claude, Gemini) to create meaningful commit messages.
+*   🧠 **Intelligent Commit Generation**: Analyzes staged code differences (`git diff --staged`) using state-of-the-art AI models (Gemini, GPT, Claude) to create meaningful commit messages.
 *   📄 **Conventional Commits**: Automatically formats messages according to the Conventional Commits specification (e.g., `feat(auth): add JWT authentication`). This improves readability and enables automated changelog generation.
 *   📝 **Optional Explanations**: Provide a high-level description of your changes as input to guide the AI, or let it infer the context solely from the code diff.
 *   ✅ **Pre-commit Hook Integration**: Automatically runs your existing native Git pre-commit hook (`.git/hooks/pre-commit`) before generating the message, ensuring code quality and style checks pass.
@@ -96,7 +96,7 @@ CommitAi requires API keys for the AI provider you intend to use. Set these as e
     export GOOGLE_API_KEY="your_google_api_key_here"
     ```
 
-You only need to set the key for the provider corresponding to the model you select (or the default, Gemini).
+You only need to set the key for the provider corresponding to the model you select (or the default, Gemini 3 Flash with Google).
 
 ### Ollama
 
@@ -163,14 +163,20 @@ The `commitai` command (which is an alias for `commitai generate`) accepts the f
     *   Example: `commitai -c "Fix typo in documentation"` (for minor changes)
     *   Can be combined with `-a`: `commitai -a -c "Quick fix and commit all"`
 
+*   `--review` / `--no-review`:
+    *   Toggle a preliminary AI review of the staged diff before generating the commit message. Default is `--review` (enabled).
+    *   When enabled, CommitAi prints a brief review and asks if you want to proceed.
+    *   Example: `commitai --no-review` to skip the review step.
+
 *   `-m <model_name>`, `--model <model_name>`:
     *   Specifies which AI model to use.
-    *   Defaults to `gemini-2.5-pro-preview-03-25`.
+    *   Specifies which AI model to use.
+    *   Defaults to `gemini-3-flash-preview`.
     *   Ensure the corresponding API key environment variable is set.
     *   Examples:
+        *   `commitai -m gemini-3-pro-preview "Use Google's Gemini 3 Pro"`
         *   `commitai -m gpt-4 "Use OpenAI's GPT-4"`
-        *   `commitai -m claude-3-opus-20240229 "Use Anthropic's Claude 3 Opus"`
-        *   `commitai -m gemini-2.5-flash-preview-04-17 "Use Google's Gemini 1.5 Flash"`
+        *   `commitai -m claude-3-opus "Use Anthropic's Claude 3 Opus"`
 
 ### Creating Repository Templates
 
