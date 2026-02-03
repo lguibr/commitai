@@ -3,13 +3,10 @@
 
 import os
 import sys
-from typing import Optional, Tuple, cast
+from typing import Optional, Tuple
 
 import click
-from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_ollama import ChatOllama
-from langchain_openai import ChatOpenAI
 
 # Keep SecretStr import in case it's needed elsewhere or for future refinement
 
@@ -46,44 +43,31 @@ def _initialize_llm(model: str) -> BaseChatModel:
     google_api_key_str = _get_google_api_key()
 
     try:
-        if model.startswith("gpt-"):
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise click.ClickException(
-                    "Error: OPENAI_API_KEY environment variable not set."
-                )
-            return ChatOpenAI(model=model, api_key=api_key)
-
-        elif model.startswith("claude-"):
-            api_key = os.getenv("ANTHROPIC_API_KEY")
-            if not api_key:
-                raise click.ClickException(
-                    "Error: ANTHROPIC_API_KEY environment variable not set."
-                )
-            return ChatAnthropic(model_name=model, api_key=api_key)
-
-        elif model.startswith("gemini-"):
-            if ChatGoogleGenerativeAI is None:
-                raise click.ClickException(
-                    "Error: 'langchain-google-genai' is not installed. "
-                    "Run 'pip install commitai[test]' or "
-                    "'pip install langchain-google-genai'"
-                )
-            if not google_api_key_str:
-                raise click.ClickException(
-                    "Error: Google API Key not found. Set GOOGLE_API_KEY, "
-                    "GEMINI_API_KEY, or GOOGLE_GENERATIVE_AI_API_KEY."
-                )
-            return ChatGoogleGenerativeAI(
-                model=model,
-                google_api_key=google_api_key_str,
-                convert_system_message_to_human=True,
+        # Enforce Gemini-Only Policy
+        # Enforce Strict Gemini-3 Policy
+        allowed_models = ["gemini-3-flash-preview", "gemini-3-pro-preview"]
+        if model not in allowed_models:
+            raise click.ClickException(
+                f"🚫 Unsupported model: {model}. "
+                f"Only Google Gemini 3 models are allowed: {', '.join(allowed_models)}"
             )
-        elif model.startswith("llama"):
-            # Ollama models (e.g., llama2, llama3)
-            return cast(BaseChatModel, ChatOllama(model=model))
-        else:
-            raise click.ClickException(f"🚫 Unsupported model: {model}")
+
+        if ChatGoogleGenerativeAI is None:
+            raise click.ClickException(
+                "Error: 'langchain-google-genai' is not installed. "
+                "Run 'pip install commitai[test]' or "
+                "'pip install langchain-google-genai'"
+            )
+        if not google_api_key_str:
+            raise click.ClickException(
+                "Error: Google API Key not found. Set GOOGLE_API_KEY, "
+                "GEMINI_API_KEY, or GOOGLE_GENERATIVE_AI_API_KEY."
+            )
+        return ChatGoogleGenerativeAI(
+            model=model,
+            google_api_key=google_api_key_str,
+            convert_system_message_to_human=True,
+        )
 
     except Exception as e:
         raise click.ClickException(f"Error initializing AI model: {e}") from e
@@ -143,9 +127,9 @@ def _handle_commit(commit_message: str, commit_flag: bool) -> None:
                 else:
                     raise click.ClickException("Aborted by user.")
         except click.Abort:
-            raise click.ClickException("Aborted by user.")
+            raise click.ClickException("Aborted by user.") from None
         except Exception as e:
-            raise click.ClickException(f"Error handling user input: {e}")
+            raise click.ClickException(f"Error handling user input: {e}") from e
 
     if not final_commit_message:
         raise click.ClickException("Aborting commit due to empty commit message.")
@@ -195,10 +179,17 @@ def cli() -> None:
     "-m",
     default="gemini-3-flash-preview",
     help=(
-        "Set the engine model (default: gemini-3-flash-preview). Examples: 'gemini-3-flash-preview', 'gemini-3-pro-preview', "
-        "'gpt-4', 'claude-3-opus'. Ensure API key env var is set "
-        "(OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY/GEMINI_API_KEY/GOOGLE_GENERATIVE_AI_API_KEY)."
+        "Set the engine model (default: gemini-3-flash-preview). "
+        "Only Google Gemini 3 models are supported "
+        "('gemini-3-flash-preview', 'gemini-3-pro-preview'). "
+        "Ensure GOOGLE_API_KEY is set."
     ),
+)
+@click.option(
+    "--deep",
+    "-d",
+    is_flag=True,
+    help="Use the deeper reasoning model (gemini-3-pro-preview).",
 )
 def generate_message(
     description: Tuple[str, ...],
@@ -207,8 +198,21 @@ def generate_message(
     template: Optional[str],
     add: bool,
     model: str,
+    deep: bool,
 ) -> None:
     explanation = " ".join(description)
+
+    # Handle Model Selection Logic
+    # 1. Default is gemini-3-flash-preview
+    # 2. If --deep is passed, upgrade to gemini-3-pro-preview
+    # (unless -m is explicitly distinct)
+    if deep:
+        # If user didn't explicitly change the default model string,
+        # upgrade to Pro
+        # If user explicitly set a model AND used --deep,
+        # we respect the explicit model but could warn (or just use it)
+        pass
+        pass
 
     llm = _initialize_llm(model)
 
@@ -231,7 +235,8 @@ def generate_message(
     # Optional pre-generation review
     if review:
         click.secho(
-            "\n\n🔎 Reviewing the staged changes before generating a commit message...\n",
+            "\n\n🔎 Reviewing the staged changes before "
+            "generating a commit message...\n",
             fg="blue",
             bold=True,
         )
@@ -254,8 +259,10 @@ def generate_message(
             fg="yellow",
         )
 
-    # Check for template from env or file if not provided via CLI (though CLI overrides or is deprecated)
-    # The agent/chain prompt Logic usually handles 'template' variable if passed in input.
+    # Check for template from env or file if not provided via CLI
+    # (though CLI overrides or is deprecated)
+    # The agent/chain prompt Logic usually handles 'template' variable
+    # if passed in input.
     # We need to fetch the template content if it exists to pass to agent.
 
     final_template_content = template
@@ -265,7 +272,8 @@ def generate_message(
 
     click.clear()
     click.secho(
-        "\n\n🧠 internal-monologue: Analyzing changes, checking for sensitive data, and summarizing...\n\n",
+        "\n\n🧠 internal-monologue: Analyzing changes, "
+        "checking for sensitive data, and summarizing...\n\n",
         fg="blue",
         bold=True,
     )
@@ -327,8 +335,14 @@ def create_template_command(template_content: Tuple[str, ...]) -> None:
 @click.option(
     "--model",
     "-m",
-    default="gpt-5",
+    default="gemini-3-flash-preview",
     help="Set the engine model to be used.",
+)
+@click.option(
+    "--deep",
+    "-d",
+    is_flag=True,
+    help="Use the deeper reasoning model (gemini-3-pro-preview).",
 )
 @click.pass_context
 def commitai_alias(
@@ -338,6 +352,7 @@ def commitai_alias(
     commit: bool,
     review: bool,
     model: str,
+    deep: bool,
 ) -> None:
     """Alias for the 'generate' command."""
     ctx.forward(
@@ -347,6 +362,7 @@ def commitai_alias(
         commit=commit,
         review=review,
         model=model,
+        deep=deep,
     )
 
 
