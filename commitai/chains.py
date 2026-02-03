@@ -64,26 +64,25 @@ def create_commit_chain(llm: BaseChatModel) -> Runnable:
 
     # 2. Define the Prompt
     # We include placeholders for summary and todos if they exist
-    system_template = """You are an expert software engineer and git commit message generator.
-Your task is to generate a clean, concise commit message following the Conventional Commits specification.
-
-Values from middleware:
-{summary_section}
-{todo_section}
-
-Input context:
-{explanation_section}
-
-Existing Code Changes (Diff):
-{diff}
-
-Instructions:
-1. Use the format: <type>(<scope>): <subject>
-2. Keep the subject line under 50 characters if possible.
-3. If there are multiple changes, provide a bulleted body.
-4. If TODOs were detected, mention them in the footer or body as appropriate.
-5. If an explanation is provided, prioritize it.
-"""
+    system_template = (
+        "You are an expert software engineer and git commit message generator.\n"
+        "Your task is to generate a clean, concise commit message following the "
+        "Conventional Commits specification.\n\n"
+        "Values from middleware:\n"
+        "{summary_section}\n"
+        "{todo_section}\n\n"
+        "Input context:\n"
+        "{explanation_section}\n\n"
+        "Existing Code Changes (Diff):\n"
+        "{diff}\n\n"
+        "Instructions:\n"
+        "1. Use the format: <type>(<scope>): <subject>\n"
+        "2. Keep the subject line under 50 characters if possible.\n"
+        "3. If there are multiple changes, provide a bulleted body.\n"
+        "4. If TODOs were detected, mention them in the footer or body as "
+        "appropriate.\n"
+        "5. If an explanation is provided, prioritize it.\n"
+    )
     prompt = ChatPromptTemplate.from_template(system_template)
 
     # 3. Helper to format the prompt inputs from state
@@ -114,7 +113,8 @@ Instructions:
         }
 
     # 4. Construct the Pipeline
-    # Parallel step to run middlewares (conceptually, though here we chain them or use RunnablePassthrough)
+    # Parallel step to run middlewares
+    # (conceptually, though here we chain them or use RunnablePassthrough)
     # Since middlewares modify state, we can chain them:
 
     middleware_chain: Runnable = (

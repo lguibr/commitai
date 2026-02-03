@@ -3,29 +3,31 @@ import os
 import subprocess
 from typing import Any, Dict, Type
 
-try:
-    from pydantic.v1 import BaseModel, Field  # type: ignore
-except ImportError:
-    from pydantic import BaseModel, Field  # type: ignore
-
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
+from pydantic import BaseModel, Field
 
 # --- TOOLS ---
 
 
 class ShellInput(BaseModel):
     command: str = Field(
-        description="The git command to execute (e.g., 'git status', 'git log'). Must start with 'git'."
+        description=(
+            "The git command to execute (e.g., 'git status', 'git log'). "
+            "Must start with 'git'."
+        )
     )
 
 
 class ReadOnlyShellTool(BaseTool):
     name: str = "git_shell"
-    description: str = "Run read-only git commands to inspect the repository state. Only 'git' commands are allowed. Write operations are blocked."
+    description: str = (
+        "Run read-only git commands to inspect the repository state. "
+        "Only 'git' commands are allowed. Write operations are blocked."
+    )
     args_schema: Type[BaseModel] = ShellInput
 
     def _run(self, command: str) -> str:
@@ -71,7 +73,10 @@ class FileSearchInput(BaseModel):
 
 class FileSearchTool(BaseTool):
     name: str = "file_search"
-    description: str = "Search for file paths in the project using glob patterns. Useful to find files to inspect."
+    description: str = (
+        "Search for file paths in the project using glob patterns. "
+        "Useful to find files to inspect."
+    )
     args_schema: Type[BaseModel] = FileSearchInput
 
     def _run(self, pattern: str) -> str:
@@ -126,7 +131,8 @@ class SummarizationMiddleware:
             return inputs
 
         # Simple summarization chain (inline invocation)
-        msg = f"Summarize these changes in 2 sentences:\n\n{diff[:5000]}"  # Truncate for summary
+        # Truncate for summary
+        msg = f"Summarize these changes in 2 sentences:\n\n{diff[:5000]}"
         resp = self.llm.invoke(msg)
         inputs["summary"] = resp.content
         return inputs
@@ -175,7 +181,8 @@ You have access to tools to explore the codebase if the diff + explanation is am
 
 Protocol:
 1. Analyze the input.
-2. If detecting POTENTIAL SENSITIVE DATA (API keys, secrets) in the diff, you MUST stop and ask the user (simulated by returning a warning message).
+2. If detecting POTENTIAL SENSITIVE DATA (API keys, secrets) in the diff, you MUST stop
+   and ask the user (simulated by returning a warning message).
 3. If clarification is needed, explore files.
 4. Final Answer MUST be ONLY the commit message.
 """
@@ -190,7 +197,7 @@ Protocol:
 
     # 4. Construct Agent
     agent = create_tool_calling_agent(llm, tools, prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
 
     # 5. Pipeline with Middleware
     def run_pipeline(inputs: Dict[str, Any]) -> str:

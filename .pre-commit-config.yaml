@@ -25,16 +25,14 @@ repos:
     hooks:
       - id: mypy
         # Ensure mypy runs with the necessary dependencies installed
-        additional_dependencies: [
-            "click>=8.0,<9.0",
-            "langchain>=0.1.0,<0.3.0",
-            "langchain-community>=0.0.20,<0.2.0",
-            "langchain-anthropic>=0.1.0,<0.3.0",
-            "langchain-openai>=0.1.0,<0.3.0",
-            "langchain-google-genai~=0.0.9",
-            "pydantic>=2.0,<3.0",
-            "types-setuptools"
-        ]
+        additional_dependencies:
+          - "click>=8.0,<9.0"
+          - "langchain>=0.1.0,<=0.3.25"
+          - "langchain-core>=0.1.0,<=0.3.58"
+          - "langchain-community>=0.0.20,<=0.3.23"
+          - "langchain-google-genai~=2.1.4"
+          - "pydantic>=2.0,<3.0"
+          - "types-setuptools"
         args: [--config-file=pyproject.toml] # Point mypy to the config
         # You might need to adjust entry if your structure changes
         # entry: mypy commitai commitai/tests

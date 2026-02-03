@@ -15,9 +15,10 @@ def test_readonly_shell_tool():
     assert "forbidden write operations" in tool._run("git commit -m 'oops'")
     assert "Only 'git' commands" in tool._run("rm -rf /")
 
-    # Test allowed command (we can't really run it in test env reliably without full git repo,
+    # Test allowed command (hard to test without full repo,
     # but we can check it doesn't return the forbidden error)
-    # Mocking subprocess run would be better but let's assume 'git status' is generally safe to attempt or fail gracefully
+    # Mocking subprocess run would be better but let's assume 'git status' is generally
+    # safe to attempt or fail gracefully
     pass
 
 
