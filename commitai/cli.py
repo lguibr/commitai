@@ -52,7 +52,7 @@ def _initialize_llm(model: str) -> BaseChatModel:
                 raise click.ClickException(
                     "Error: OPENAI_API_KEY environment variable not set."
                 )
-            return ChatOpenAI(model=model, api_key=api_key, temperature=0.7)
+            return ChatOpenAI(model=model, api_key=api_key)
 
         elif model.startswith("claude-"):
             api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -60,7 +60,7 @@ def _initialize_llm(model: str) -> BaseChatModel:
                 raise click.ClickException(
                     "Error: ANTHROPIC_API_KEY environment variable not set."
                 )
-            return ChatAnthropic(model_name=model, api_key=api_key, temperature=0.7)
+            return ChatAnthropic(model_name=model, api_key=api_key)
 
         elif model.startswith("gemini-"):
             if ChatGoogleGenerativeAI is None:
@@ -77,12 +77,11 @@ def _initialize_llm(model: str) -> BaseChatModel:
             return ChatGoogleGenerativeAI(
                 model=model,
                 google_api_key=google_api_key_str,
-                temperature=0.7,
                 convert_system_message_to_human=True,
             )
         elif model.startswith("llama"):
             # Ollama models (e.g., llama2, llama3)
-            return cast(BaseChatModel, ChatOllama(model=model, temperature=0.7))
+            return cast(BaseChatModel, ChatOllama(model=model))
         else:
             raise click.ClickException(f"🚫 Unsupported model: {model}")
 
@@ -121,18 +120,32 @@ def _handle_commit(commit_message: str, commit_flag: bool) -> None:
         raise click.ClickException(f"Error writing commit message file: {e}") from e
 
     final_commit_message = commit_message
+    final_commit_message = commit_message
     if not commit_flag:
+        click.secho(
+            f"\n📝 Generated Commit Message:\n{'-'*40}\n{commit_message}\n{'-'*40}\n",
+            fg="green",
+        )
+
+        # Interactive loop for Enter-Enter flow
         try:
-            click.edit(filename=commit_msg_path)
-            with open(commit_msg_path, "r") as f:
-                final_commit_message = f.read().strip()
-        except click.UsageError as e:
-            click.secho(f"Could not open editor: {e}", fg="yellow")
-            click.secho(f"Using generated message:\n\n{commit_message}\n", fg="yellow")
-        except IOError as e:
-            raise click.ClickException(
-                f"Error reading commit message file after edit: {e}"
-            ) from e
+            # Default to Yes (Enter)
+            if click.confirm("🚀 Commit with this message?", default=True):
+                pass  # final_commit_message is already set
+            else:
+                if click.confirm("✏️  Edit message?", default=True):
+                    try:
+                        click.edit(filename=commit_msg_path)
+                        with open(commit_msg_path, "r") as f:
+                            final_commit_message = f.read().strip()
+                    except click.UsageError as e:
+                        click.secho(f"Could not open editor: {e}", fg="yellow")
+                else:
+                    raise click.ClickException("Aborted by user.")
+        except click.Abort:
+            raise click.ClickException("Aborted by user.")
+        except Exception as e:
+            raise click.ClickException(f"Error handling user input: {e}")
 
     if not final_commit_message:
         raise click.ClickException("Aborting commit due to empty commit message.")

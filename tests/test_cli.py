@@ -58,6 +58,7 @@ def mock_generate_deps(tmp_path):
         mock_file_open_patch as mock_builtin_open,
         patch("os.path.exists") as mock_path_exists,
         patch("commitai.cli.create_commit_agent") as mock_create_agent,
+        patch("click.confirm", return_value=True) as mock_confirm,
     ):  # Mock os.path.exists
         mock_path_exists.return_value = False
 
@@ -121,6 +122,7 @@ def mock_generate_deps(tmp_path):
             "commit_msg_path": fake_commit_msg_path,
             "create_agent": mock_create_agent,
             "agent_instance": mock_agent_instance,
+            "confirm": mock_confirm,
         }
 
 
@@ -160,10 +162,9 @@ def test_generate_default_gemini(mock_generate_deps):
     mock_generate_deps["file_open"].return_value.write.assert_called_with(
         "Generated commit message"
     )
-    mock_generate_deps["edit"].assert_called_once_with(filename=commit_msg_path)
-    mock_generate_deps["file_open"].assert_any_call(commit_msg_path, "r")
-    mock_generate_deps["file_open"].return_value.read.assert_called()
     mock_generate_deps["commit"].assert_called_once_with("Generated commit message")
+    # Edit should NOT be called if user confirms immediately
+    mock_generate_deps["edit"].assert_not_called()
 
 
 def test_generate_select_gpt4(mock_generate_deps):
@@ -180,7 +181,8 @@ def test_generate_select_gpt4(mock_generate_deps):
     mock_generate_deps["openai_class"].assert_called_once()
     oc_kwargs = mock_generate_deps["openai_class"].call_args.kwargs
     assert oc_kwargs.get("model") == "gpt-4"
-    assert oc_kwargs.get("temperature") == 0.7
+    assert oc_kwargs.get("model") == "gpt-4"
+    assert "temperature" not in oc_kwargs
     mock_generate_deps["agent_instance"].invoke.assert_called_once()
     mock_generate_deps["commit"].assert_called_once()
 
@@ -200,7 +202,6 @@ def test_generate_select_claude(mock_generate_deps):
     mock_generate_deps["anthropic_class"].assert_called_once_with(
         model_name="claude-3-opus-20240229",
         api_key="fake_anthropic_key",
-        temperature=0.7,
     )
     mock_generate_deps["agent_instance"].invoke.assert_called_once()
     mock_generate_deps["commit"].assert_called_once()
@@ -217,9 +218,7 @@ def test_generate_select_ollama(mock_generate_deps):
     )
 
     assert result.exit_code == 0, result.output
-    mock_generate_deps["ollama_class"].assert_called_once_with(
-        model="llama3", temperature=0.7
-    )
+    mock_generate_deps["ollama_class"].assert_called_once_with(model="llama3")
     mock_generate_deps["agent_instance"].invoke.assert_called_once()
     mock_generate_deps["commit"].assert_called_once()
 
