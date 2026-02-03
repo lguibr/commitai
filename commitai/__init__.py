@@ -3,7 +3,7 @@
 
 # This __version__ string is read by hatchling during the build process
 # Make sure to update it for new releases.
-__version__ = "2.1.0"
+__version__ = "2.2.2"
 
 # The importlib.metadata approach is generally for reading the version
 # of an *already installed* package at runtime. We don't need it here
