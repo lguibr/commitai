@@ -206,12 +206,11 @@ def generate_message(
     # 2. If --deep is passed, upgrade to gemini-3-pro-preview
     # (unless -m is explicitly distinct)
     if deep:
-        # If user didn't explicitly change the default model string,
-        # upgrade to Pro
-        # If user explicitly set a model AND used --deep,
-        # we respect the explicit model but could warn (or just use it)
-        pass
-        pass
+        # Upgrade to Pro model if deep flag is set
+        # We override the model unless the user explicitly chose a different one
+        # (For simplicity here, we assume --deep implies pro)
+        if model == "gemini-3-flash-preview":
+            model = "gemini-3-pro-preview"
 
     llm = _initialize_llm(model)
 
