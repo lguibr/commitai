@@ -382,9 +382,9 @@ def test_generate_edit_error_io(mock_generate_deps):
     # Check exit code is 1
     result = runner.invoke(cli, ["generate", "--no-review", "Test explanation"])
 
-    assert (
-        result.exit_code == 1
-    ), f"Expected exit code 1, got {result.exit_code}. Output: {result.output}"
+    assert result.exit_code == 1, (
+        f"Expected exit code 1, got {result.exit_code}. Output: {result.output}"
+    )
     # The IOError bubbles up to the outer exception handler
     assert "Error handling user input: Read permission denied" in result.output
     mock_generate_deps["commit"].assert_not_called()

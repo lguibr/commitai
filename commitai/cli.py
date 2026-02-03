@@ -106,7 +106,8 @@ def _handle_commit(commit_message: str, commit_flag: bool) -> None:
     final_commit_message = commit_message
     if not commit_flag:
         click.secho(
-            f"\n📝 Generated Commit Message:\n{'-'*40}\n{commit_message}\n{'-'*40}\n",
+            f"\n📝 Generated Commit Message:\n{'-' * 40}\n"
+            f"{commit_message}\n{'-' * 40}\n",
             fg="green",
         )
 
