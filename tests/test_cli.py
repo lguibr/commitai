@@ -52,7 +52,7 @@ def mock_generate_deps(tmp_path):
         patch("os.makedirs") as mock_makedirs,
         mock_file_open_patch as mock_builtin_open,
         patch("os.path.exists") as mock_path_exists,
-        patch("click.confirm", return_value=True) as mock_confirm,
+        patch("commitai.ui.RichUI") as mock_ui_class,
     ):  # Mock os.path.exists
         mock_path_exists.return_value = False
 
@@ -60,7 +60,9 @@ def mock_generate_deps(tmp_path):
 
         # Agent Mock (RunnableLambda now)
         mock_agent_runnable = MagicMock()
-        mock_agent_runnable.invoke.return_value = "Generated commit message"
+        mock_agent_runnable.invoke.return_value = iter(
+            [{"type": "token", "content": "Generated commit message"}]
+        )
         mock_create_agent.return_value = mock_agent_runnable
 
         if mock_google_class_in_cli is not None:
@@ -69,6 +71,14 @@ def mock_generate_deps(tmp_path):
         content_mock = MagicMock()
         content_mock.content = "Generated commit message"
         mock_google_instance.invoke.return_value = content_mock
+
+        # Setup Rich UI Mock
+        mock_ui_instance = mock_ui_class.return_value
+        # Default behavior for interactive staging
+        # (False means nothing staged, proceed normally if add=True or check diff)
+        mock_ui_instance.interactive_staging.return_value = False
+        mock_ui_instance.confirm_action.return_value = True
+        mock_ui_instance.stream_response.return_value = "Generated commit message"
 
         def getenv_side_effect(key, default=None):
             if key == "TEMPLATE_COMMIT":
@@ -94,8 +104,8 @@ def mock_generate_deps(tmp_path):
             "path_exists": mock_path_exists,
             "commit_msg_path": fake_commit_msg_path,
             "create_agent": mock_create_agent,
-            "agent_instance": mock_agent_runnable,  # Still useful alias for tests
-            "confirm": mock_confirm,
+            "agent_instance": mock_agent_runnable,
+            "ui": mock_ui_instance,  # Access mock UI
         }
 
 
@@ -111,6 +121,8 @@ def test_generate_default_gemini(mock_generate_deps):
 
     result = runner.invoke(cli, ["generate", "--no-review", "Test explanation"])
 
+    # We can't rely on exit code easily if sys.exit was called by UI print_error
+    # But here we expect success (exit code 0)
     assert result.exit_code == 0, result.output
 
     # Check that Flash was initialized
@@ -120,6 +132,7 @@ def test_generate_default_gemini(mock_generate_deps):
     )
     mock_generate_deps["agent_instance"].invoke.assert_called_once()
     mock_generate_deps["commit"].assert_called_once_with("Generated commit message")
+    mock_generate_deps["ui"].render_header.assert_called_once()
 
 
 def test_generate_deep_flag(mock_generate_deps):
@@ -143,7 +156,9 @@ def test_generate_deep_flag(mock_generate_deps):
 
 
 def test_generate_unsupported_model(mock_generate_deps):
-    """Test that unsupported models raise an error."""
+    """Test that unsupported models raise an error in click validation/init logic."""
+    # Since check is done in _initialize_llm which raises ClickException,
+    # runner captures it.
     runner = CliRunner()
     result = runner.invoke(cli, ["generate", "--no-review", "-m", "gpt-4"])
 
@@ -170,10 +185,13 @@ def test_generate_with_commit_flag(mock_generate_deps):
     result = runner.invoke(cli, ["generate", "--no-review", "-c", "Test explanation"])
 
     assert result.exit_code == 0, result.output
-    # Edit should NOT be called (explicit commit, skipping confirmation/edit loop
-    # logic mock usually covers this but here we assert explicit args)
-    # Actually in code, if commit_flag is set, we bypass edit loop entirely.
-    mock_generate_deps["edit"].assert_not_called()
+    # UI actions are bypassed for confirmation?
+    # No, cli.py logic: if commit=True, pass commit=True to _handle_commit
+    # _handle_commit logic: if not commit_flag: show confirmation loop.
+    # So if commit=True, it skips confirmation loop.
+
+    mock_generate_deps["ui"].confirm_action.assert_not_called()
+
     commit_msg_path = mock_generate_deps["commit_msg_path"]
     mock_generate_deps["file_open"].assert_called_once_with(commit_msg_path, "w")
     mock_generate_deps["file_open"].return_value.write.assert_called_once_with(
@@ -186,17 +204,14 @@ def test_generate_no_staged_changes(mock_generate_deps):
     """Test generate command with no staged changes."""
     mock_generate_deps["diff"].return_value = ""
     runner = CliRunner()
+
+    # Click Runner catches sys.exit(1)
     result = runner.invoke(cli, ["generate", "--no-review", "Test explanation"])
 
     assert result.exit_code == 1, result.output
-    assert "Warning: No staged changes found" in result.output
-
-    # Init shouldn't be called if diff check fails first
-    # (in new logic implementation diff is checked after init?
-    # Actually in code: list diff -> if not diff exit -> then init chain -> then invoke)
-    # Wait, in code: init llm -> prepare diff -> create chain
-    assert result.exit_code == 1, result.output
-    assert "Warning: No staged changes found" in result.output
+    mock_generate_deps["ui"].print_error.assert_called_with(
+        "⚠️ Warning: No staged changes found. Exiting."
+    )
 
     mock_generate_deps["agent_instance"].invoke.assert_not_called()
     mock_generate_deps["commit"].assert_not_called()
@@ -208,8 +223,10 @@ def test_generate_pre_commit_hook_fails(mock_generate_deps):
     runner = CliRunner()
     result = runner.invoke(cli, ["generate", "--no-review", "Test explanation"])
 
-    assert result.exit_code == 1, result.output
-    assert "Pre-commit hook failed" in result.output
+    assert result.exit_code == 1
+    mock_generate_deps["ui"].print_error.assert_called_with(
+        "Pre-commit hook failed. Aborting commit."
+    )
     mock_generate_deps["diff"].assert_not_called()
     mock_generate_deps["commit"].assert_not_called()
 
@@ -223,32 +240,25 @@ def test_generate_missing_google_key(mock_generate_deps):
     runner = CliRunner()
     result = runner.invoke(cli, ["generate", "--no-review", "Test explanation"])
 
-    assert result.exit_code == 1, result.output
+    assert result.exit_code == 1
     assert "Google API Key not found" in result.output
     mock_generate_deps["google_class"].assert_not_called()
 
 
 def test_generate_empty_commit_message_aborts(mock_generate_deps):
-    """Test generate command aborts with empty commit message after edit."""
+    """Test generate command aborts with empty commit message."""
     runner = CliRunner()
-    # Simulate reading empty string after edit
-    mock_generate_deps["file_open"].return_value.read.return_value = ""
-
-    # Force user to say "E"dit then save empty file?
-    # Current mock_confirm returns true, so it just commits
-    # "Generated commit message" actually.
-    # To test empty message abort, we need the initial generation to be empty
-    # OR the edit flow to result in empty.
-
-    # Let's say Agent returns empty string (which shouldn't happen but...)
-    mock_generate_deps["agent_instance"].invoke.return_value = ""
+    # Simulate streaming returns empty string?
+    # Or result is empty string.
+    mock_generate_deps["ui"].stream_response.return_value = ""
 
     result = runner.invoke(cli, ["generate", "--no-review", "Test explanation"])
 
-    # If agent returns empty, code does: commit_message="" -> handle_commit(empty)
-    # -> checks if empty -> aborts
+    # Code calls: sys.exit(1) inside _handle_commit if final is empty
     assert result.exit_code == 1
-    assert "Aborting commit due to empty commit message" in result.output
+    mock_generate_deps["ui"].print_error.assert_called_with(
+        "Aborting commit due to empty commit message."
+    )
 
 
 def test_generate_no_explanation(mock_generate_deps):
@@ -290,17 +300,8 @@ def test_generate_with_global_template(mock_generate_deps):
     # Verify agent invocation has correct args
     call_args = mock_generate_deps["agent_instance"].invoke.call_args
     assert call_args is not None, "agent invoke was not called"
-    # Args passed to invoke is a dict
     invoked_args = call_args[0][0]
     assert invoked_args["explanation"] == "Test explanation"
-
-    # We can't easily check for "Global Template Instruction" inside the prompt
-    # because the chain is mocked.
-    # The logic for TEMPLATE_COMMIT is now somewhat disconnected
-    # unless we update create_commit_chain to accept it.
-    # For now, let's assume the test focus is on "it runs".
-    # (In a real refactor we'd likely inject the template into the system prompt
-    # via the chain factory)
 
     mock_generate_deps["commit"].assert_called_once()
 
@@ -348,7 +349,10 @@ def test_generate_with_deprecated_template_option(mock_generate_deps):
     )
 
     assert result.exit_code == 0, result.output
-    assert "Warning: The --template/-t option is deprecated" in result.output
+    # UI verification
+    mock_generate_deps["ui"].console.print.assert_any_call(
+        "[warning]⚠️ --template/-t is deprecated.[/warning]"
+    )
     mock_generate_deps["agent_instance"].invoke.assert_called_once()
     mock_generate_deps["commit"].assert_called_once()
 
@@ -356,37 +360,50 @@ def test_generate_with_deprecated_template_option(mock_generate_deps):
 def test_generate_edit_error_usage(mock_generate_deps):
     """Test generate command handling UsageError during click.edit."""
     runner = CliRunner()
-    # Mock confirm: False (don't commit), True (edit)
-    mock_generate_deps["confirm"].side_effect = [False, True]
+    # Mock confirm flow in _handle_commit:
+    # prompt "Commit...?" -> False
+    # prompt "Edit...?" -> True
+    mock_generate_deps["ui"].confirm_action.side_effect = [False, True]
     mock_generate_deps["edit"].side_effect = UsageError("Cannot find editor")
 
     result = runner.invoke(cli, ["generate", "--no-review", "Test explanation"])
 
     assert result.exit_code == 0, result.output
-    assert "Could not open editor: Cannot find editor" in result.output
-    # The code doesn't print "Using generated message:" explicitly, it just continues.
+    mock_generate_deps["ui"].print_error.assert_called_with(
+        "Could not open editor: Cannot find editor"
+    )
+
+    # Continue to commit old message if edit fails?
+    # Current code: exceptions caught, loop finishes (or raises?)
+    # If edit raises UsageError, we print error, then what?
+    # Loop ends?
+    # The code:
+    # else:
+    #    if ui.confirm_action("Edit message manually?"):
+    #        try: ... except UsageError: print_error
+    # Does it recursively call or exit?
+    # It catches, does nothing else.
+    # Then final_commit_message check -> proceeds.
+
     mock_generate_deps["commit"].assert_called_once_with("Generated commit message")
 
 
 def test_generate_edit_error_io(mock_generate_deps):
     """Test generate command handling IOError during reading after click.edit."""
     runner = CliRunner()
-    # Mock confirm: False (don't commit), True (edit)
-    mock_generate_deps["confirm"].side_effect = [False, True]
+    mock_generate_deps["ui"].confirm_action.side_effect = [False, True]
 
     # Simulate read failing on the specific handle for COMMIT_EDITMSG
     mock_generate_deps["file_open"].return_value.read.side_effect = IOError(
         "Read permission denied"
     )
 
-    # Check exit code is 1
     result = runner.invoke(cli, ["generate", "--no-review", "Test explanation"])
 
-    assert result.exit_code == 1, (
-        f"Expected exit code 1, got {result.exit_code}. Output: {result.output}"
+    assert result.exit_code == 1
+    mock_generate_deps["ui"].print_error.assert_called_with(
+        "Error handling user input: Read permission denied"
     )
-    # The IOError bubbles up to the outer exception handler
-    assert "Error handling user input: Read permission denied" in result.output
     mock_generate_deps["commit"].assert_not_called()
 
 
@@ -404,8 +421,10 @@ def test_generate_write_error_io(mock_generate_deps):
 
     result = runner.invoke(cli, ["generate", "Test explanation"])
 
-    assert result.exit_code == 1, result.output
-    assert "Error writing commit message file" in result.output
+    assert result.exit_code == 1
+    mock_generate_deps["ui"].print_error.assert_called_with(
+        "Error writing commit message file: Write permission denied"
+    )
     mock_generate_deps["edit"].assert_not_called()
     mock_generate_deps["commit"].assert_not_called()
 
@@ -417,7 +436,7 @@ def test_generate_google_module_not_installed(mock_generate_deps):
     mock_generate_deps["google_class"] = None
     result = runner.invoke(cli, ["generate", "--no-review", "Test explanation"])
 
-    assert result.exit_code == 1, result.output
+    assert result.exit_code == 1
     assert "'langchain-google-genai' is not installed" in result.output
 
 
@@ -427,9 +446,10 @@ def test_generate_llm_invoke_error(mock_generate_deps):
     mock_generate_deps["agent_instance"].invoke.side_effect = Exception("AI API Error")
     result = runner.invoke(cli, ["generate", "--no-review", "Test explanation"])
 
-    assert result.exit_code == 1, result.output
-    # agent.py raises "Error during AI generation: ..."
-    assert "Error during AI generation: AI API Error" in result.output
+    assert result.exit_code == 1
+    mock_generate_deps["ui"].print_error.assert_called_with(
+        "Error during AI generation: AI API Error"
+    )
     mock_generate_deps["commit"].assert_not_called()
 
 
@@ -440,8 +460,10 @@ def test_generate_makedirs_error(mock_generate_deps):
 
     result = runner.invoke(cli, ["generate", "Test explanation"])
 
-    assert result.exit_code == 1, result.output
-    assert "Error creating .git directory: Permission denied" in result.output
+    assert result.exit_code == 1
+    mock_generate_deps["ui"].print_error.assert_called_with(
+        "Error creating .git directory: Permission denied"
+    )
     mock_generate_deps["file_open"].assert_not_called()
     mock_generate_deps["commit"].assert_not_called()
 
@@ -453,17 +475,25 @@ def test_create_template_command():
     """Test the create-template command."""
     runner = CliRunner()
     with patch("commitai.cli.save_commit_template") as mock_save_template:
-        result = runner.invoke(cli, ["create-template", "Test template content"])
-        assert result.exit_code == 0, result.output
-        mock_save_template.assert_called_once_with("Test template content")
-        assert "Template saved successfully." in result.output
+        # We need to patch the UI locally inside the command if imported there
+        with patch("commitai.ui.RichUI") as mock_ui_class:
+            result = runner.invoke(cli, ["create-template", "Test template content"])
+            assert result.exit_code == 0
+
+            mock_save_template.assert_called_once_with("Test template content")
+            mock_ui_class.return_value.print_success.assert_called_with(
+                "Template saved successfully."
+            )
 
 
 def test_create_template_command_no_content():
     """Test the create-template command with no content."""
     runner = CliRunner()
     with patch("commitai.cli.save_commit_template") as mock_save_template:
-        result = runner.invoke(cli, ["create-template"])
-        assert result.exit_code == 0, result.output
-        mock_save_template.assert_not_called()
-        assert "Please provide the template content." in result.output
+        with patch("commitai.ui.RichUI") as mock_ui_class:
+            result = runner.invoke(cli, ["create-template"])
+            assert result.exit_code == 0
+            mock_save_template.assert_not_called()
+            mock_ui_class.return_value.print_error.assert_called_with(
+                "Please provide the template content."
+            )

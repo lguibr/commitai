@@ -58,3 +58,28 @@ def save_commit_template(template: str) -> None:
     template_path = os.path.join(repo_path, ".git", "commit_template.txt")
     with open(template_path, "w") as f:
         f.write(template)
+
+
+def get_unstaged_files() -> list[str]:
+    """Returns a list of files that are modified/untracked but not staged."""
+    # Modified files
+    modified = (
+        subprocess.check_output(["git", "diff", "--name-only"])
+        .strip()
+        .decode()
+        .splitlines()
+    )
+    # Untracked files
+    untracked = (
+        subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard"])
+        .strip()
+        .decode()
+        .splitlines()
+    )
+    # Filter empty strings
+    return [f for f in modified + untracked if f]
+
+
+def stage_file(file_path: str) -> None:
+    """Stages a specific file."""
+    subprocess.run(["git", "add", file_path], check=True)

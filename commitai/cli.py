@@ -87,12 +87,17 @@ def _prepare_context() -> str:
 
 
 def _handle_commit(commit_message: str, commit_flag: bool) -> None:
+    from commitai.ui import RichUI
+
+    ui = RichUI()
+
     repo_path = get_repository_name()
     git_dir = os.path.join(repo_path, ".git")
     try:
         os.makedirs(git_dir, exist_ok=True)
     except OSError as e:
-        raise click.ClickException(f"Error creating .git directory: {e}") from e
+        ui.print_error(f"Error creating .git directory: {e}")
+        sys.exit(1)
 
     commit_msg_path = os.path.join(git_dir, "COMMIT_EDITMSG")
 
@@ -100,46 +105,41 @@ def _handle_commit(commit_message: str, commit_flag: bool) -> None:
         with open(commit_msg_path, "w") as f:
             f.write(commit_message)
     except IOError as e:
-        raise click.ClickException(f"Error writing commit message file: {e}") from e
+        ui.print_error(f"Error writing commit message file: {e}")
+        sys.exit(1)
 
     final_commit_message = commit_message
-    final_commit_message = commit_message
     if not commit_flag:
-        click.secho(
-            f"\n📝 Generated Commit Message:\n{'-' * 40}\n"
-            f"{commit_message}\n{'-' * 40}\n",
-            fg="green",
-        )
+        # Interactive loop handled by stream logic?
+        # Actually the panel already shows it.
+        # But we need to ask validation.
 
         # Interactive loop for Enter-Enter flow
         try:
             # Default to Yes (Enter)
-            if click.confirm("🚀 Commit with this message?", default=True):
+            if ui.confirm_action("Commit with this message?"):
                 pass  # final_commit_message is already set
             else:
-                if click.confirm("✏️  Edit message?", default=True):
+                if ui.confirm_action("Edit message manually?"):
                     try:
                         click.edit(filename=commit_msg_path)
                         with open(commit_msg_path, "r") as f:
                             final_commit_message = f.read().strip()
                     except click.UsageError as e:
-                        click.secho(f"Could not open editor: {e}", fg="yellow")
+                        ui.print_error(f"Could not open editor: {e}")
                 else:
-                    raise click.ClickException("Aborted by user.")
-        except click.Abort:
-            raise click.ClickException("Aborted by user.") from None
+                    ui.print_error("Aborted by user.")
+                    sys.exit(0)
         except Exception as e:
-            raise click.ClickException(f"Error handling user input: {e}") from e
+            ui.print_error(f"Error handling user input: {e}")
+            sys.exit(1)
 
     if not final_commit_message:
-        raise click.ClickException("Aborting commit due to empty commit message.")
+        ui.print_error("Aborting commit due to empty commit message.")
+        sys.exit(1)
 
     create_commit(final_commit_message)
-    click.secho(
-        f"\n\n✅ Committed message:\n\n{final_commit_message}\n\n",
-        fg="green",
-        bold=True,
-    )
+    ui.print_success("Committed successfully!")
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -153,7 +153,6 @@ def cli() -> None:
     "--commit",
     "-c",
     is_flag=True,
-    help="Commit the changes with the generated message",
 )
 @click.option(
     "--review/--no-review",
@@ -191,7 +190,7 @@ def cli() -> None:
     is_flag=True,
     help="Use the deeper reasoning model (gemini-3-pro-preview).",
 )
-def generate_message(
+def generate_message(  # noqa: C901
     description: Tuple[str, ...],
     commit: bool,
     review: bool,
@@ -200,96 +199,80 @@ def generate_message(
     model: str,
     deep: bool = False,
 ) -> None:
+    # Initialize Rich UI
+    from commitai.ui import RichUI
+
+    ui = RichUI()
+    ui.render_header()
+
     explanation = " ".join(description)
 
     # Handle Model Selection Logic
-    # 1. Default is gemini-3-flash-preview
-    # 2. If --deep is passed, upgrade to gemini-3-pro-preview
-    # (unless -m is explicitly distinct)
     if deep:
-        # Upgrade to Pro model if deep flag is set
-        # We override the model unless the user explicitly chose a different one
-        # (For simplicity here, we assume --deep implies pro)
         if model == "gemini-3-flash-preview":
             model = "gemini-3-pro-preview"
 
     llm = _initialize_llm(model)
 
-    if add:
+    # Interactive Wizard Mode (if not explicitly adding all)
+    if not add:
+        staged = ui.interactive_staging()
+        if staged:
+            # Files were staged, so we should proceed with checks
+            pass
+    elif add:
         stage_all_changes()
 
-    click.secho(
-        "\n🔍 Looking for a native pre-commit hook and running it\n",
-        fg="blue",
-        bold=True,
-    )
+    ui.console.print("\n[blue]🔍 Looking for pre-commit hook...[/blue]")
     if not run_pre_commit_hook():
-        raise click.ClickException("🚫 Pre-commit hook failed. Aborting commit.")
+        ui.print_error("Pre-commit hook failed. Aborting commit.")
+        sys.exit(1)
 
-    formatted_diff = _prepare_context()
+    try:
+        formatted_diff = _prepare_context()
+    except click.ClickException as e:
+        ui.print_error(str(e))
+        sys.exit(1)
 
     # Initialize Agent Pipeline
     agent_pipeline = create_commit_agent(llm)
 
     # Optional pre-generation review
     if review:
-        click.secho(
-            "\n\n🔎 Reviewing the staged changes before "
-            "generating a commit message...\n",
-            fg="blue",
-            bold=True,
-        )
-
+        ui.console.print("\n[info]🔎 Reviewing staged changes...[/info]")
         # Only prompt for confirmation when running in an interactive TTY
         try:
             is_interactive = sys.stdin.isatty()
         except Exception:
             is_interactive = False
         if is_interactive:
-            if not click.confirm(
-                "Proceed with generating the commit message?", default=True
-            ):
-                raise click.ClickException("Aborted by user after review.")
+            if not ui.confirm_action("Proceed with generation?"):
+                ui.print_error("Aborted by user.")
+                sys.exit(0)
 
     if template:
-        click.secho(
-            "⚠️ Warning: The --template/-t option is deprecated. Use environment "
-            "variable TEMPLATE_COMMIT or `commitai-create-template` command.",
-            fg="yellow",
-        )
-
-    # Check for template from env or file if not provided via CLI
-    # (though CLI overrides or is deprecated)
-    # The agent/chain prompt Logic usually handles 'template' variable
-    # if passed in input.
-    # We need to fetch the template content if it exists to pass to agent.
+        ui.console.print("[warning]⚠️ --template/-t is deprecated.[/warning]")
 
     final_template_content = template
     if not final_template_content:
-        # Check env var or local file
         final_template_content = os.getenv("TEMPLATE_COMMIT") or get_commit_template()
 
-    click.clear()
-    click.secho(
-        "\n\n🧠 internal-monologue: Analyzing changes, "
-        "checking for sensitive data, and summarizing...\n\n",
-        fg="blue",
-        bold=True,
-    )
+    # Streaming Execution
     try:
         assert llm is not None
-        # Invoke the Agent Pipeline
         inputs = {"diff": formatted_diff, "explanation": explanation}
         if final_template_content:
             inputs["template"] = final_template_content
 
-        commit_message = agent_pipeline.invoke(inputs)
+        # Invoke the Agent Pipeline (which now returns a generator)
+        stream_gen = agent_pipeline.invoke(inputs)
 
-        if not isinstance(commit_message, str):
-            commit_message = str(commit_message)
+        # Use UI to handle streaming visualization
+        commit_message = ui.stream_response(stream_gen)
 
     except Exception as e:
-        raise click.ClickException(f"Error during AI generation: {e}") from e
+        ui.print_error(f"Error during AI generation: {e}")
+        sys.exit(1)
 
     _handle_commit(commit_message, commit)
 
@@ -298,12 +281,16 @@ def generate_message(
 @click.argument("template_content", nargs=-1, type=click.UNPROCESSED)
 def create_template_command(template_content: Tuple[str, ...]) -> None:
     """Saves a repository-specific commit template."""
+    from commitai.ui import RichUI
+
+    ui = RichUI()
+
     content = " ".join(template_content)
     if content:
         save_commit_template(content)
-        click.secho("📝 Template saved successfully.", fg="green")
+        ui.print_success("Template saved successfully.")
     else:
-        click.secho("❗ Please provide the template content.", fg="red")
+        ui.print_error("Please provide the template content.")
 
 
 # --- Alias Commands ---
