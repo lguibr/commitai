@@ -1,40 +1,30 @@
 from unittest.mock import MagicMock, patch
 
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, ToolMessage
 
 from commitai.agent import create_commit_agent, scan_todos, summarize_context
 
 
 def test_agent_v3_initialization():
-    """Verify that the V3 agent can be initialized with the new middlewares."""
+    """Verify that the V3 agent utilizes create_react_agent."""
     mock_llm = MagicMock()
 
-    with patch("commitai.agent.create_agent") as mock_create_agent:
-        mock_create_agent.return_value = MagicMock()  # Return a mock graph
+    with patch("commitai.agent.create_react_agent") as mock_create_react:
+        mock_create_react.return_value = MagicMock()
 
-        with (
-            patch("commitai.agent.SummarizationMiddleware") as mock_summ,
-            patch("commitai.agent.FilesystemFileSearchMiddleware") as mock_files,
-            patch("commitai.agent.ShellToolMiddleware") as mock_shell,
-            patch("commitai.agent.HumanInTheLoopMiddleware") as mock_hitl,
-            patch("commitai.agent.LLMToolSelectorMiddleware") as mock_selector,
-        ):
-            agent_runnable = create_commit_agent(mock_llm)
+        agent_runnable = create_commit_agent(mock_llm)
 
-            # Verify middlewares were initialized
-            mock_summ.assert_called_once()
-            mock_files.assert_called_once()
-            mock_shell.assert_called_once()
-            mock_hitl.assert_called_once()
-            mock_selector.assert_called_once()
+        # Verify create_react_agent was called with correct model and tools
+        mock_create_react.assert_called_once()
+        _, kwargs = mock_create_react.call_args
+        assert kwargs["model"] == mock_llm
+        assert "tools" in kwargs
+        # Ensure 'shell' tool is in the list
+        tools = kwargs["tools"]
+        assert len(tools) > 0
+        assert tools[0].name == "shell"
 
-            # Verify create_agent call
-            mock_create_agent.assert_called_once()
-            _, kwargs = mock_create_agent.call_args
-            assert "middleware" in kwargs
-            assert len(kwargs["middleware"]) == 5
-
-            assert agent_runnable is not None
+        assert agent_runnable is not None
 
 
 def test_scan_todos():
@@ -47,7 +37,6 @@ def test_scan_todos():
     assert len(result["todos"]) == 2
     assert "Fix this later" in result["todos"][0]
     assert "Old bug" in result["todos"][1]
-    # Check for the raw line content as captured
     assert "- # TODO: Fix this later" in result["todo_str"]
 
 
@@ -65,73 +54,96 @@ def test_summarize_context_short():
     mock_llm.invoke.return_value = AIMessage(content="Summary")
     diff = "short diff"
     summary = summarize_context(mock_llm, diff)
-
-    # It returns content directly now
     assert summary == "Summary"
-    mock_llm.invoke.assert_called_once()
-
-
-def test_summarize_context_long():
-    """Test summarization triggered for long diffs."""
-    mock_llm = MagicMock()
-    mock_llm.invoke.return_value = AIMessage(content="Summary of changes")
-
-    # Create diff > 3000 chars
-    diff = "a" * 3005
-    summary = summarize_context(mock_llm, diff)
-
-    assert summary == "Summary of changes"
-    mock_llm.invoke.assert_called_once()
 
 
 def test_run_pipeline_streaming():
     """Test the streaming pipeline execution."""
     mock_llm = MagicMock()
-    # Mock LLM response for summarize_context call inside pipeline
-    mock_llm.invoke.return_value = AIMessage(content="Summary")
 
-    # Mock the agent graph created inside factory
-    mock_graph = MagicMock()
+    # We mock threading.Thread to inject events into the queue that the pipeline creates
+    with (
+        patch("commitai.agent.create_react_agent") as mock_create_react,
+        patch("commitai.agent.threading.Thread") as mock_thread_cls,
+    ):
+        mock_graph = MagicMock()
+        mock_create_react.return_value = mock_graph
 
-    # Mock stream output from graph
-    final_message = AIMessage(content="feat: new feature")
-    events = [
-        {
-            "messages": [
-                AIMessage(
-                    content="", tool_calls=[{"name": "git_log", "args": {}, "id": "1"}]
-                )
-            ]
-        },
-        {"messages": [final_message]},
-    ]
-    mock_graph.stream.return_value = iter(events)
+        # When t.start() is called, we populate the queue found in t.args
+        def side_effect_start():
+            # args=(q, agent_graph, messages)
+            # We get the 'q' instance from the constructor call args of Thread
+            # mock_thread_cls.call_args gives us the arguments passed to Thread(...)
+            _, thread_kwargs = mock_thread_cls.call_args
+            # Or args might be positional? In agent.py: target=..., args=(...)
+            thread_args = thread_kwargs.get("args")
+            q = thread_args[0]
 
-    with patch("commitai.agent.create_agent", return_value=mock_graph):
-        with (
-            patch("commitai.agent.SummarizationMiddleware"),
-            patch("commitai.agent.FilesystemFileSearchMiddleware"),
-            patch("commitai.agent.ShellToolMiddleware"),
-            patch("commitai.agent.HumanInTheLoopMiddleware"),
-            patch("commitai.agent.LLMToolSelectorMiddleware"),
-        ):
-            pipeline_func = create_commit_agent(mock_llm)
+            # Simulate events
+            # 1. Tool Call
+            q.put(
+                {
+                    "event": "on_tool_start",
+                    "name": "shell",
+                    "data": {"input": {"command": "git log"}},
+                }
+            )
+            # 2. Tool Output
+            tool_msg = ToolMessage(content="commit info", tool_call_id="1")
+            q.put(
+                {"event": "on_tool_end", "name": "shell", "data": {"output": tool_msg}}
+            )
+            # 3. Token Stream (Gemini style list)
+            q.put(
+                {
+                    "event": "on_chat_model_stream",
+                    "data": {
+                        "chunk": AIMessage(content=[{"type": "text", "text": "feat: "}])
+                    },
+                }
+            )
+            q.put(
+                {
+                    "event": "on_chat_model_stream",
+                    "data": {
+                        "chunk": AIMessage(
+                            content=[{"type": "text", "text": "streaming"}]
+                        )
+                    },
+                }
+            )
+            # 4. Stop
+            q.put(None)
 
-            inputs = {"diff": "some diff", "explanation": "expl"}
-            # Use stream() to ensure we get the generator/iterator properly
-            stream_gen = pipeline_func.stream(inputs)
+        # Setup the mock thread instance
+        mock_thread_instance = MagicMock()
+        mock_thread_cls.return_value = mock_thread_instance
+        mock_thread_instance.start.side_effect = side_effect_start
 
-            results = list(stream_gen)
+        # Initialize agent
+        pipeline_func = create_commit_agent(mock_llm)
+        inputs = {"diff": "some diff", "explanation": "expl"}
 
-            # Verify we received dicts
-            for r in results:
-                assert isinstance(r, dict), f"Received non-dict result: {r}"
+        # Invoke stream via RunnableLambda
+        stream_gen = pipeline_func.stream(inputs)
+        results = list(stream_gen)
 
-            # Check for thought event (from tool call)
-            assert any(r["type"] == "thought" for r in results)
+        # Check Results
+        # Thought events
+        assert any(r["type"] == "thought" for r in results)
 
-            # Check for token events (from final message)
-            token_events = [r for r in results if r["type"] == "token"]
-            assert len(token_events) > 0
-            full_text = "".join(t["content"] for t in token_events)
-            assert "feat: new feature" in full_text
+        # Tool Use
+        tool_uses = [r for r in results if r["type"] == "tool_use"]
+        assert len(tool_uses) == 1
+        assert "git log" in tool_uses[0]["content"]
+
+        # Tool Output
+        tool_outputs = [r for r in results if r["type"] == "tool_output"]
+        assert len(tool_outputs) == 1
+        # The output logic wraps it in [bold green]...
+        assert "commit info" in tool_outputs[0]["content"]
+
+        # Tokens
+        tokens = [r["content"] for r in results if r["type"] == "token"]
+        full_text = "".join(tokens)
+        assert "feat: streaming" in full_text

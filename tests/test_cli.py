@@ -129,6 +129,7 @@ def test_generate_default_gemini(mock_generate_deps):
     mock_generate_deps["google_class"].assert_called_with(
         model="gemini-3-flash-preview",
         google_api_key="fake_google_key",
+        streaming=True,
     )
     mock_generate_deps["agent_instance"].stream.assert_called_once()
     mock_generate_deps["commit"].assert_called_once_with("Generated commit message")
@@ -152,6 +153,7 @@ def test_generate_deep_flag(mock_generate_deps):
     mock_generate_deps["google_class"].assert_called_with(
         model="gemini-3-pro-preview",
         google_api_key="fake_google_key",
+        streaming=True,
     )
 
 
