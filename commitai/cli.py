@@ -265,9 +265,7 @@ def generate_message(  # noqa: C901
             inputs["template"] = final_template_content
 
         # Invoke the Agent Pipeline (which now returns a generator)
-        stream_gen = agent_pipeline.invoke(inputs)
-
-        # Use UI to handle streaming visualization
+        stream_gen = agent_pipeline.stream(inputs)
         commit_message = ui.stream_response(stream_gen)
 
     except Exception as e:

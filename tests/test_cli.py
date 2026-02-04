@@ -60,7 +60,7 @@ def mock_generate_deps(tmp_path):
 
         # Agent Mock (RunnableLambda now)
         mock_agent_runnable = MagicMock()
-        mock_agent_runnable.invoke.return_value = iter(
+        mock_agent_runnable.stream.return_value = iter(
             [{"type": "token", "content": "Generated commit message"}]
         )
         mock_create_agent.return_value = mock_agent_runnable
@@ -130,7 +130,7 @@ def test_generate_default_gemini(mock_generate_deps):
         model="gemini-3-flash-preview",
         google_api_key="fake_google_key",
     )
-    mock_generate_deps["agent_instance"].invoke.assert_called_once()
+    mock_generate_deps["agent_instance"].stream.assert_called_once()
     mock_generate_deps["commit"].assert_called_once_with("Generated commit message")
     mock_generate_deps["ui"].render_header.assert_called_once()
 
@@ -213,7 +213,7 @@ def test_generate_no_staged_changes(mock_generate_deps):
         "⚠️ Warning: No staged changes found. Exiting."
     )
 
-    mock_generate_deps["agent_instance"].invoke.assert_not_called()
+    mock_generate_deps["agent_instance"].stream.assert_not_called()
     mock_generate_deps["commit"].assert_not_called()
 
 
@@ -270,7 +270,7 @@ def test_generate_no_explanation(mock_generate_deps):
     result = runner.invoke(cli, ["generate", "--no-review"])
 
     assert result.exit_code == 0, result.output
-    mock_generate_deps["agent_instance"].invoke.assert_called_once()
+    mock_generate_deps["agent_instance"].stream.assert_called_once()
     mock_generate_deps["commit"].assert_called_once()
 
 
@@ -298,7 +298,7 @@ def test_generate_with_global_template(mock_generate_deps):
     assert result.exit_code == 0, result.output
 
     # Verify agent invocation has correct args
-    call_args = mock_generate_deps["agent_instance"].invoke.call_args
+    call_args = mock_generate_deps["agent_instance"].stream.call_args
     assert call_args is not None, "agent invoke was not called"
     invoked_args = call_args[0][0]
     assert invoked_args["explanation"] == "Test explanation"
@@ -324,7 +324,7 @@ def test_generate_with_local_template(mock_get_template, mock_generate_deps):
     assert result.exit_code == 0, result.output
     mock_get_template.assert_called_once()  # Verify get_commit_template was called
     # Verify agent invocation has correct args
-    call_args = mock_generate_deps["agent_instance"].invoke.call_args
+    call_args = mock_generate_deps["agent_instance"].stream.call_args
     assert call_args is not None, "agent invoke was not called"
     invoked_args = call_args[0][0]
     assert invoked_args["explanation"] == "Test explanation"
@@ -353,7 +353,7 @@ def test_generate_with_deprecated_template_option(mock_generate_deps):
     mock_generate_deps["ui"].console.print.assert_any_call(
         "[warning]⚠️ --template/-t is deprecated.[/warning]"
     )
-    mock_generate_deps["agent_instance"].invoke.assert_called_once()
+    mock_generate_deps["agent_instance"].stream.assert_called_once()
     mock_generate_deps["commit"].assert_called_once()
 
 
@@ -443,7 +443,7 @@ def test_generate_google_module_not_installed(mock_generate_deps):
 def test_generate_llm_invoke_error(mock_generate_deps):
     """Test generate command handling error during llm.invoke."""
     runner = CliRunner()
-    mock_generate_deps["agent_instance"].invoke.side_effect = Exception("AI API Error")
+    mock_generate_deps["agent_instance"].stream.side_effect = Exception("AI API Error")
     result = runner.invoke(cli, ["generate", "--no-review", "Test explanation"])
 
     assert result.exit_code == 1
