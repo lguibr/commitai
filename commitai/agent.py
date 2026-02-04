@@ -108,7 +108,7 @@ def _run_async_bridge(
     asyncio.run(consume_stream())
 
 
-def create_commit_agent(llm: BaseChatModel) -> Runnable:
+def create_commit_agent(llm: BaseChatModel) -> Runnable:  # noqa: C901
     # 1. Configure System Prompt
     # We use a template, but create_agent expects a static string or message.
     # OR we can format it before passing to invoke.
@@ -246,7 +246,12 @@ def create_commit_agent(llm: BaseChatModel) -> Runnable:
                     name = event["name"]
                     output = data.get("output")
 
-                    output_str = str(output)
+                    # Extract string content if it's a Message object
+                    if hasattr(output, "content"):
+                        output_str = str(output.content)
+                    else:
+                        output_str = str(output)
+
                     if len(output_str) > 500:
                         output_str = output_str[:500] + "... (truncated)"
 
