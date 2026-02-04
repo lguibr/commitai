@@ -10,6 +10,12 @@
 
 <img
   src="https://raw.githubusercontent.com/lguibr/commitai/main/bitmap.png"
+  alt="logo"
+  width="400"
+/>
+
+<img
+  src="https://raw.githubusercontent.com/lguibr/commitai/main/showcase.png"
   alt="screenshot"
   width="400"
 />
