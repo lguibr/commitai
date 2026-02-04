@@ -214,8 +214,21 @@ def create_commit_agent(llm: BaseChatModel) -> Runnable:
                 # 1. Output Tokens (Final Message or Thoughts)
                 if kind == "on_chat_model_stream":
                     chunk = data.get("chunk")
-                    if chunk and chunk.content:
-                        yield {"type": "token", "content": chunk.content}
+                    if chunk:
+                        content = chunk.content
+                        # Handle complex content (list of dicts from Gemini)
+                        if isinstance(content, list):
+                            text_content = ""
+                            for part in content:
+                                if (
+                                    isinstance(part, dict)
+                                    and part.get("type") == "text"
+                                ):
+                                    text_content += part.get("text", "")
+                            content = text_content
+
+                        if content:
+                            yield {"type": "token", "content": content}
 
                 # 2. Tool Start
                 elif kind == "on_tool_start":
