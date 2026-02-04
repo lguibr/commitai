@@ -61,13 +61,39 @@ Simply stage your files and run `commitai`. It analyzes the diff, optionally tak
 
 ## Installation
 
-Ensure you have Python 3.8+ and Git installed.
+**Requirement:** Python 3.10+ (macOS/Linux).
 
-Install **CommitAi** directly from PyPI:
+### 📦 Production Install (PyPI)
+
+Install globally or in your virtual environment:
 
 ```bash
 pip install commitai
 ```
+
+Ensure the binary is in your PATH. Verify with:
+
+```bash
+commitai --version
+# Should output: 3.1.0
+```
+
+### 🛠️ Development / Local Install
+
+If you are developing or testing local changes (macOS/Linux only):
+
+```bash
+# Clone the repository
+git clone https://github.com/lguibr/commitai.git
+cd commitai
+
+# Install in editable mode
+pip install -e .
+```
+
+> [!IMPORTANT]
+> Ensure you run `commitai` from the ACTIVE Python environment where it was installed.
+> System-level `pip` binaries might conflict. Use `which commitai` to verify you are using the correct shim/binary.
 
 ## Configuration
 

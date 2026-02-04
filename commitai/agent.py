@@ -1,19 +1,17 @@
-import os
+import asyncio
+import queue
+import subprocess
+import threading
 import time
-from typing import Any, Dict, Generator, List, cast
+from typing import Any, Dict, Generator, List
 
-# Import new middlewares and agent factory
-from langchain.agents import create_agent
-from langchain.agents.middleware import (
-    FilesystemFileSearchMiddleware,
-    HumanInTheLoopMiddleware,
-    LLMToolSelectorMiddleware,
-    ShellToolMiddleware,
-    SummarizationMiddleware,
-)
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable, RunnableLambda
+from langchain_core.tools import tool
+
+# Standard LangGraph ReAct imports
+from langgraph.prebuilt import create_react_agent
 
 # --- HELPER FUNCTIONS (Former Custom Middleware Logic) ---
 
@@ -48,8 +46,69 @@ def summarize_context(llm: BaseChatModel, diff: str) -> str:
 # --- AGENT FACTORY ---
 
 
-def create_commit_agent(llm: BaseChatModel) -> Runnable:
+@tool
+def shell(command: str) -> str:
+    """
+    Executes a read-only git command to inspect the repository.
+    Allowed commands: git log, git diff, git show, git status.
+    Forbidden: git commit, git push, rm, mv, etc.
+    """
+    cmd = command.strip()
+    if not cmd.startswith("git"):
+        return "Error: Only git commands are allowed."
 
+    # Whitelist
+    allowed = ["log", "diff", "show", "status", "rev-parse", "ls-files"]
+    if not any(sub in cmd for sub in allowed):
+        return f"Error: Command '{cmd}' is not in the whitelist: {allowed}"
+
+    # Block destructive
+    forbidden = [
+        "push",
+        "commit",
+        "add",
+        "rm",
+        "mv",
+        "checkout",
+        "branch",
+        "merge",
+        "rebase",
+    ]
+    if any(sub in cmd for sub in forbidden):
+        return f"Error: Destructive command '{cmd}' is forbidden."
+
+    try:
+        result = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
+        return result.decode("utf-8")
+    except subprocess.CalledProcessError as e:
+        return f"Error executing command: {e.output.decode('utf-8')}"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
+def _run_async_bridge(
+    q_ref: queue.SimpleQueue[Any],
+    agent_graph: Any,
+    messages: List[Any],
+) -> None:
+    """Helper to run the async event stream in a separate thread."""
+
+    async def consume_stream() -> None:
+        try:
+            # We must use 'v2' events to get token streaming
+            async for event in agent_graph.astream_events(
+                {"messages": messages}, version="v2"
+            ):
+                q_ref.put(event)
+        except Exception as e:
+            q_ref.put({"type": "error", "error": e})
+        finally:
+            q_ref.put(None)  # Sentinel to stop
+
+    asyncio.run(consume_stream())
+
+
+def create_commit_agent(llm: BaseChatModel) -> Runnable:
     # 1. Configure System Prompt
     # We use a template, but create_agent expects a static string or message.
     # OR we can format it before passing to invoke.
@@ -73,8 +132,6 @@ def create_commit_agent(llm: BaseChatModel) -> Runnable:
         "",
         "YOUR AVAILABLE TOOLS (USE AGGRESSIVELY):",
         "- `shell`: EXECUTE 'git log -n 5' or 'git diff HEAD~1' for context.",
-        "- `file_search`: LOCATE related files to understand architecture.",
-        "- `file_read`: READ surrounding code for semantic meaning.",
         "",
         "THE PROTOCOL OF EXCELLENCE:",
         "1. ANALYZE 'why' it changed, not just 'what'.",
@@ -88,51 +145,14 @@ def create_commit_agent(llm: BaseChatModel) -> Runnable:
     ]
     base_system_template = "\n".join(prompt_lines)
 
-    # 2. Configure Middlewares
-
-    # Summarization Middleware (for conversation history)
-    # Trigger summarization if history exceeds token limit.
-    summ_mw = SummarizationMiddleware(
+    # 2. Create ReAct Agent (Standard Graph)
+    # This automatically handles the Action -> Observation -> Thought lookback loop.
+    agent_graph = create_react_agent(
         model=llm,
-        trigger=("tokens", 6000),  # Adjust based on context window
-        keep=("messages", 4),
+        tools=[shell],
+        # System prompt injected via state_modifier or checkpointer if needed.
+        # For simplicity in create_react_agent, we prepend it to messages in execution.
     )
-
-    # Human In The Loop
-    # Require approval for shell commands to ensure safety (Read-Only enforcement)
-    hitl_mw = HumanInTheLoopMiddleware(
-        interrupt_on={"shell": True},
-        description_prefix="⚠️ Shell command requires approval.",
-    )
-
-    # Shell Tool Middleware
-    # Provides 'shell' tool.
-    shell_mw = ShellToolMiddleware(
-        workspace_root=os.getcwd(),
-        tool_name="shell",
-        tool_description=(
-            "Execute git commands to inspect repository. "
-            "ONLY 'git' read and not destructive commands allowed."
-        ),
-    )
-
-    # File Search Middleware
-    search_mw = FilesystemFileSearchMiddleware(root_path=os.getcwd(), use_ripgrep=True)
-
-    # LLM Tool Selector
-    # Helps agent pick relevant tools if we had many.
-    selector_mw = LLMToolSelectorMiddleware(model=llm, max_tools=3)
-
-    # 3. Create Agent
-    # We pass empty tools list because middlewares inject them
-    # or we want only middleware tools.
-    agent_graph = create_agent(
-        model=llm,
-        tools=[],
-        middleware=cast(list, [summ_mw, search_mw, shell_mw, selector_mw, hitl_mw]),
-        system_prompt="You are a CommitAI Assistant. Use tools only when necessary.",
-        # Fallback static prompts
-    )  # type: ignore[var-annotated]
 
     # 4. Streaming Wrapper
     def run_pipeline(inputs: Dict[str, Any]) -> Generator[Dict[str, Any], None, None]:
@@ -140,6 +160,7 @@ def create_commit_agent(llm: BaseChatModel) -> Runnable:
         Executes the agent pipeline with pre-processing and streaming.
         """
         # Pre-processing
+        yield {"type": "thought", "content": "Processing context..."}
         diff = inputs.get("diff", "")
 
         # 1. Scan/Summarize (Synchronous)
@@ -161,60 +182,72 @@ def create_commit_agent(llm: BaseChatModel) -> Runnable:
             HumanMessage(content="Generate the commit message."),
         ]
 
-        # 4. Stream Execution
-        # We use stream_mode="values" to get state updates
+        # 4. Stream Execution (V2 Standard via Threaded Async Bridge)
+        # Robust pattern: Run async loop in a separate thread, push to queue.
+
         try:
-            # Note: If HITL interrupts, this stream might stop or yield interrupt?
-            # For CLI usage, handling real interrupt/resume is complex.
-            # "Human in the loop" implies we ASK the user.
-            # CLI 'stream_response' doesn't support inputting approval mid-stream.
-            # For now, we'll yield the interrupt as a "thought" request?
+            yield {"type": "thought", "content": "Initializing streaming..."}
 
-            for event in agent_graph.stream(
-                {"messages": cast(List[Any], messages)}, stream_mode="values"
-            ):
-                last_msg = event["messages"][-1]
+            # Queue for events
+            q: queue.SimpleQueue[Any] = queue.SimpleQueue()
 
-                # Check for Tool Calls (Thinking)
-                if last_msg.type == "ai" and last_msg.tool_calls:
-                    tool_names = ", ".join(t["name"] for t in last_msg.tool_calls)
-                    yield {
-                        "type": "thought",
-                        "content": f"Deciding to use: {tool_names}...",
-                    }
+            # Start thread
+            t = threading.Thread(
+                target=_run_async_bridge, args=(q, agent_graph, messages)
+            )
+            t.start()
 
-                # Check for Tool Outputs
-                elif last_msg.type == "tool":
-                    yield {
-                        "type": "thought",
-                        "content": f"Received output from {last_msg.name}.",
-                    }
+            # Consume from queue locally (Sync)
+            while True:
+                item = q.get()
+                if item is None:
+                    break
 
-                # Check for Content (Final Answer or intermediate thought)
-                elif last_msg.type == "ai" and last_msg.content:
-                    # Usually the last message is the final answer if loop finishes.
-                    # We store it and stream it at the end loop purely for visual effect
-                    # if strictly separating.
-                    # Or we can treat it as final.
-                    pass
+                if isinstance(item, dict) and "error" in item:
+                    yield {"type": "error", "content": f"Stream Error: {item['error']}"}
+                    continue
 
-            # Final extraction (simplified)
-            # Fetch final state?
-            # Does stream yield the final state at the end? Yes.
-            final_content = event["messages"][-1].content
+                event = item
+                kind = event["event"]
+                data = event["data"]
 
-            if isinstance(final_content, str) and final_content:
-                yield {"type": "thought", "content": "Drafting message..."}
-                # Simulate token streaming
-                chunk_size = 4
-                for i in range(0, len(final_content), chunk_size):
-                    yield {
-                        "type": "token",
-                        "content": final_content[i : i + chunk_size],
-                    }
-                    time.sleep(0.005)
+                # 1. Output Tokens (Final Message or Thoughts)
+                if kind == "on_chat_model_stream":
+                    chunk = data.get("chunk")
+                    if chunk and chunk.content:
+                        yield {"type": "token", "content": chunk.content}
+
+                # 2. Tool Start
+                elif kind == "on_tool_start":
+                    name = event["name"]
+                    inputs = data.get("input")
+                    content_str = (
+                        f"[bold cyan]🛠️  Tool Call:[/bold cyan] {name}\n"
+                        f"    [dim]Args: {inputs}[/dim]"
+                    )
+                    yield {"type": "tool_use", "content": content_str}
+                    time.sleep(0.05)
+
+                # 3. Tool Output
+                elif kind == "on_tool_end":
+                    name = event["name"]
+                    output = data.get("output")
+
+                    output_str = str(output)
+                    if len(output_str) > 500:
+                        output_str = output_str[:500] + "... (truncated)"
+
+                    content_str = (
+                        f"[bold green]✅  Output ({name}):[/bold green]\n"
+                        f"    [dim]{output_str}[/dim]"
+                    )
+                    yield {"type": "tool_output", "content": content_str}
+                    time.sleep(0.05)
+
+            t.join()
 
         except Exception as e:
             yield {"type": "error", "content": f"Agent Error: {str(e)}"}
 
+    # Return the runnable wrapper
     return RunnableLambda(run_pipeline)

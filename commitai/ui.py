@@ -1,5 +1,4 @@
 # File: commitai/ui.py
-import os
 from typing import Generator
 
 import questionary
@@ -28,9 +27,24 @@ theme = Theme(
 
 console = Console(theme=theme)
 
-ASCII_ART_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "ascii-art.txt"
-)
+ASCII_ART = r"""
+ ....                        ++*++                       :::::
+..............              ++++++              -:::::::-:- :::
+.............:..              +**              ==--::-  :::::::
+  ...       :...           =++++++=            ---
+            ....      ***+++++++++++++++       ::-
+             ...     ***+++****++++++++++*     ::-
+             ...     ***+++****+++++++++++     :::       -----
+             ...::::-+**++   **+++  ++++++=---=:----------- ---
+               ...-:-+**+++++**++++++++++++-::==---------------
+              ...    ***++++++*+++++++*++* :::- -------  -----
+             ::::     ####***********###*  ----  ------
+  .....      ...        ###**####****##   -----:  ---    -----
+.........   ...               +++        :::::::: ---- ---------
+...   .....:..       ++++++++**+        :::-   ::-  ------   ---
+..........            +**+++            -:::::::::     ---------
+ .......                                  -:::::         ------
+"""
 
 
 class RichUI:
@@ -40,20 +54,9 @@ class RichUI:
     def render_header(self):
         """Renders the persistent header with ASCII art."""
         self.console.clear()
-        if os.path.exists(ASCII_ART_PATH):
-            with open(ASCII_ART_PATH, "r") as f:
-                art = f.read()
-                # Center and colorize the art
-                self.console.print(
-                    Panel(
-                        Text(art, justify="center", style="header"),
-                        border_style="blue",
-                        title="CommitAI",
-                        subtitle="State of the Art Commit Assistant",
-                    )
-                )
-        else:
-            self.console.print(Panel("CommitAI", style="header"))
+        # Center and colorize the art
+        # Center and colorize the art
+        self.console.print(Text(ASCII_ART, style="header"))
         self.console.print()
 
     def interactive_staging(self) -> bool:
@@ -66,13 +69,16 @@ class RichUI:
             return False
 
         choices = [questionary.Choice(f, checked=False) for f in unstaged]
+        # Add "Select All" option at the end as requested
+        SELECT_ALL_OPTION = ">> Select All <<"
+        choices.append(questionary.Choice(SELECT_ALL_OPTION, checked=False))
 
         self.console.print(
-            "[info]📝 Unstaged changes detected. Let's select what to include:[/info]"
+            "[info]📝 Unstaged changes detected. Let's select what to include:[/info]\n"
         )
 
         selected_files = questionary.checkbox(
-            "Select files to stage:",
+            "Select files:",
             choices=choices,
             style=questionary.Style(
                 [
@@ -91,6 +97,10 @@ class RichUI:
         ).ask()
 
         if selected_files:
+            # Handle "Select All" logic
+            if SELECT_ALL_OPTION in selected_files:
+                selected_files = unstaged
+
             with self.console.status("[bold blue]Staging files...", spinner="dots"):
                 for file_path in selected_files:
                     stage_file(file_path)
@@ -103,48 +113,83 @@ class RichUI:
 
     def stream_response(self, stream_generator: Generator):
         """
-        Handles the streaming of the agent response.
-        Displays a spinner for 'thought' events and streams text for 'token' events.
+        Handles the streaming of the agent response with distinct UI boxes.
         """
-        content = ""
-        current_status = "Thinking..."
+        from rich.console import Group
 
-        # We use a Live display to update the panel in real-time
+        tool_log: list[str] = []
+        message_content = ""
+        current_thought = "Initializing..."
+
+        def generate_layout():
+            items = []
+
+            # 1. Thinking Box (Spinner + Current Status)
+            items.append(
+                Panel(
+                    Spinner("dots", text=f" {current_thought}"),
+                    title="[bold magenta]Thinking[/bold magenta]",
+                    border_style="magenta",
+                    padding=(0, 1),
+                )
+            )
+
+            # 2. Tools Box (Only if tools have been used)
+            if tool_log:
+                # Show tool events (User requested "tools used" box)
+                items.append(
+                    Panel(
+                        "\n".join(tool_log),
+                        title="[bold blue]Tools Used[/bold blue]",
+                        border_style="blue",
+                    )
+                )
+
+            # 3. Message Box (Only if content exists)
+            if message_content:
+                items.append(
+                    Panel(
+                        Markdown(message_content),
+                        title=("[bold green]Generated Commit Message[/bold green]"),
+                        border_style="green",
+                    )
+                )
+
+            return Group(*items)
+
+        # Use Live display
         with Live(
             console=self.console, refresh_per_second=10, vertical_overflow="visible"
         ) as live:
-            # Initial state
-            live.update(Spinner("dots", text=current_status))
+            live.update(generate_layout())
 
             for event in stream_generator:
-                event_type = event.get("type")
-                event_content = event.get("content", "")
+                etype = event.get("type")
+                content = event.get("content", "")
 
-                if event_type == "thought":
-                    # Update the status spinner text
-                    current_status = event_content
-                    # We can print ephemeral status updates above final panel if desired
-                    # For now just keep the spinner active.
-                    # Strategy: Use the Live component for the MAIN output.
-                    # 'Thoughts' can be ephemeral logs above it or
-                    # updates to spinner.
-                    live.update(Spinner("dots", text=f"[blue]{current_status}[/blue]"))
+                if etype == "thought":
+                    current_thought = content
 
-                elif event_type == "token":
-                    # Once we start getting tokens, switch to showing content in a Panel
-                    content += event_content
-                    live.update(
-                        Panel(
-                            Markdown(content),
-                            title="[bold green]Generated Commit Message[/bold green]",
-                            border_style="green",
-                        )
-                    )
+                elif etype in ("tool_use", "tool_output"):
+                    tool_log.append(content)
+                    current_thought = "Executing tools..."  # Update status too
 
-        return content
+                elif etype == "token":
+                    if isinstance(content, list):
+                        content = "".join(str(c) for c in content)
+                    message_content += str(content)
+                    current_thought = "Drafting message..."
+
+                elif etype == "error":
+                    current_thought = f"[red]Error: {content}[/red]"
+                    # Ensure we don't lose the error visibility
+
+                live.update(generate_layout())
+
+        return message_content
 
     def confirm_action(self, message: str) -> bool:
-        return bool(Confirm.ask(f"[bold]{message}[/bold]"))
+        return bool(Confirm.ask(f"[bold]{message}[/bold]", default=True))
 
     def print_error(self, message: str):
         self.console.print(f"[error]❌ {message}[/error]")

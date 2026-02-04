@@ -8,6 +8,8 @@ from typing import Optional, Tuple
 import click
 from langchain_core.language_models.chat_models import BaseChatModel
 
+from commitai import __version__
+
 # Keep SecretStr import in case it's needed elsewhere or for future refinement
 
 # Conditional import for Google Generative AI
@@ -66,6 +68,7 @@ def _initialize_llm(model: str) -> BaseChatModel:
         return ChatGoogleGenerativeAI(
             model=model,
             google_api_key=google_api_key_str,
+            streaming=True,
         )
 
     except Exception as e:
@@ -143,6 +146,7 @@ def _handle_commit(commit_message: str, commit_flag: bool) -> None:
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
+@click.version_option(__version__, "--version", "-v", message="%(version)s")
 def cli() -> None:
     pass
 
@@ -298,6 +302,7 @@ def create_template_command(template_content: Tuple[str, ...]) -> None:
     name="commitai",
     context_settings={"ignore_unknown_options": True},
 )
+@click.version_option(__version__, "--version", "-v", message="%(version)s")
 @click.argument("description", nargs=-1, type=click.UNPROCESSED)
 @click.option(
     "--add",
