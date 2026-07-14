@@ -2,14 +2,15 @@ from unittest.mock import MagicMock, patch
 
 from langchain_core.messages import AIMessage, ToolMessage
 
-from commitai.agent import create_commit_agent, scan_todos, summarize_context
+from commitai.agent.core import create_commit_agent
+from commitai.agent.tools import scan_todos, summarize_context
 
 
 def test_agent_v3_initialization():
     """Verify that the V3 agent utilizes create_react_agent."""
     mock_llm = MagicMock()
 
-    with patch("commitai.agent.create_react_agent") as mock_create_react:
+    with patch("commitai.agent.core.create_react_agent") as mock_create_react:
         mock_create_react.return_value = MagicMock()
 
         agent_runnable = create_commit_agent(mock_llm)
@@ -63,18 +64,20 @@ def test_run_pipeline_streaming():
 
     # We mock threading.Thread to inject events into the queue that the pipeline creates
     with (
-        patch("commitai.agent.create_react_agent") as mock_create_react,
-        patch("commitai.agent.threading.Thread") as mock_thread_cls,
+        patch("commitai.agent.core.threading.Thread") as mock_thread,
+        patch("commitai.agent.core.scan_todos"),
+        patch("commitai.agent.core.summarize_context"),
+        patch("commitai.agent.core.create_react_agent") as mock_cra,
     ):
         mock_graph = MagicMock()
-        mock_create_react.return_value = mock_graph
+        mock_cra.return_value = mock_graph
 
         # When t.start() is called, we populate the queue found in t.args
         def side_effect_start():
             # args=(q, agent_graph, messages)
             # We get the 'q' instance from the constructor call args of Thread
             # mock_thread_cls.call_args gives us the arguments passed to Thread(...)
-            _, thread_kwargs = mock_thread_cls.call_args
+            _, thread_kwargs = mock_thread.call_args
             # Or args might be positional? In agent.py: target=..., args=(...)
             thread_args = thread_kwargs.get("args")
             q = thread_args[0]
@@ -117,7 +120,7 @@ def test_run_pipeline_streaming():
 
         # Setup the mock thread instance
         mock_thread_instance = MagicMock()
-        mock_thread_cls.return_value = mock_thread_instance
+        mock_thread.return_value = mock_thread_instance
         mock_thread_instance.start.side_effect = side_effect_start
 
         # Initialize agent

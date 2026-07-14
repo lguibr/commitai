@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
 import subprocess
-from typing import Optional
 
 
 def get_repository_name() -> str:
@@ -42,22 +41,6 @@ def run_pre_commit_hook() -> bool:
         except subprocess.CalledProcessError:
             return False
     return True
-
-
-def get_commit_template() -> Optional[str]:
-    repo_path = get_repository_name()
-    template_path = os.path.join(repo_path, ".git", "commit_template.txt")
-    if os.path.exists(template_path):
-        with open(template_path, "r") as f:
-            return f.read()
-    return os.getenv("TEMPLATE_COMMIT")
-
-
-def save_commit_template(template: str) -> None:
-    repo_path = get_repository_name()
-    template_path = os.path.join(repo_path, ".git", "commit_template.txt")
-    with open(template_path, "w") as f:
-        f.write(template)
 
 
 def get_unstaged_files() -> list[str]:

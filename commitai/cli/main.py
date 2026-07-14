@@ -1,78 +1,23 @@
-# File: commitai/cli.py
-# -*- coding: utf-8 -*-
-
 import os
 import sys
 from typing import Optional, Tuple
 
 import click
-from langchain_core.language_models.chat_models import BaseChatModel
 
 from commitai import __version__
-
-# Keep SecretStr import in case it's needed elsewhere or for future refinement
-
-# Conditional import for Google Generative AI
-try:
-    from langchain_google_genai import ChatGoogleGenerativeAI
-except ImportError:
-    ChatGoogleGenerativeAI = None  # type: ignore
-
-from commitai.agent import create_commit_agent
-from commitai.git import (
+from commitai.agent.core import create_commit_agent
+from commitai.cli.config import _initialize_llm
+from commitai.git.core import (
     create_commit,
-    get_commit_template,
     get_current_branch_name,
     get_repository_name,
     get_staged_changes_diff,
     run_pre_commit_hook,
-    save_commit_template,
     stage_all_changes,
 )
-
-
-def _get_google_api_key() -> Optional[str]:
-    """Gets the Google API key from environment variables in priority order."""
-    return (
-        os.getenv("GOOGLE_API_KEY")
-        or os.getenv("GEMINI_API_KEY")
-        or os.getenv("GOOGLE_GENERATIVE_AI_API_KEY")
-    )
-
-
-def _initialize_llm(model: str) -> BaseChatModel:
-    """Initializes and returns the LangChain chat model based on the model name."""
-    google_api_key_str = _get_google_api_key()
-
-    try:
-        # Enforce Gemini-Only Policy
-        # Enforce Strict Gemini-3 Policy
-        allowed_models = ["gemini-3-flash-preview", "gemini-3-pro-preview"]
-        if model not in allowed_models:
-            raise click.ClickException(
-                f"🚫 Unsupported model: {model}. "
-                f"Only Google Gemini 3 models are allowed: {', '.join(allowed_models)}"
-            )
-
-        if ChatGoogleGenerativeAI is None:
-            raise click.ClickException(
-                "Error: 'langchain-google-genai' is not installed. "
-                "Run 'pip install commitai[test]' or "
-                "'pip install langchain-google-genai'"
-            )
-        if not google_api_key_str:
-            raise click.ClickException(
-                "Error: Google API Key not found. Set GOOGLE_API_KEY, "
-                "GEMINI_API_KEY, or GOOGLE_GENERATIVE_AI_API_KEY."
-            )
-        return ChatGoogleGenerativeAI(
-            model=model,
-            google_api_key=google_api_key_str,
-            streaming=True,
-        )
-
-    except Exception as e:
-        raise click.ClickException(f"Error initializing AI model: {e}") from e
+from commitai.template import get_template, save_template
+from commitai.types import TemplateType
+from commitai.ui.core import RichUI
 
 
 def _prepare_context() -> str:
@@ -82,16 +27,10 @@ def _prepare_context() -> str:
 
     repo_name = get_repository_name()
     branch_name = get_current_branch_name()
-    # Return just the diff for the chain, or context?
-    # The chain prompt expects 'diff'.
-    # Current helper was returning "Repo/Branch\n\nDiff".
-    # Let's keep it to maximize context for the chain.
     return f"{repo_name}/{branch_name}\n\n{diff}"
 
 
 def _handle_commit(commit_message: str, commit_flag: bool) -> None:
-    from commitai.ui import RichUI
-
     ui = RichUI()
 
     repo_path = get_repository_name()
@@ -113,15 +52,9 @@ def _handle_commit(commit_message: str, commit_flag: bool) -> None:
 
     final_commit_message = commit_message
     if not commit_flag:
-        # Interactive loop handled by stream logic?
-        # Actually the panel already shows it.
-        # But we need to ask validation.
-
-        # Interactive loop for Enter-Enter flow
         try:
-            # Default to Yes (Enter)
             if ui.confirm_action("Commit with this message?"):
-                pass  # final_commit_message is already set
+                pass
             else:
                 if ui.confirm_action("Edit message manually?"):
                     try:
@@ -180,11 +113,11 @@ def cli() -> None:
 @click.option(
     "--model",
     "-m",
-    default="gemini-3-flash-preview",
+    default="gemini-flash-latest",
     help=(
-        "Set the engine model (default: gemini-3-flash-preview). "
-        "Only Google Gemini 3 models are supported "
-        "('gemini-3-flash-preview', 'gemini-3-pro-preview'). "
+        "Set the engine model (default: gemini-flash-latest). "
+        "Only Google Gemini models are supported "
+        "('gemini-flash-latest', 'gemini-pro-latest'). "
         "Ensure GOOGLE_API_KEY is set."
     ),
 )
@@ -192,7 +125,7 @@ def cli() -> None:
     "--deep",
     "-d",
     is_flag=True,
-    help="Use the deeper reasoning model (gemini-3-pro-preview).",
+    help="Use the deeper reasoning model (gemini-pro-latest).",
 )
 def generate_message(  # noqa: C901
     description: Tuple[str, ...],
@@ -203,26 +136,20 @@ def generate_message(  # noqa: C901
     model: str,
     deep: bool = False,
 ) -> None:
-    # Initialize Rich UI
-    from commitai.ui import RichUI
-
     ui = RichUI()
     ui.render_header()
 
     explanation = " ".join(description)
 
-    # Handle Model Selection Logic
     if deep:
-        if model == "gemini-3-flash-preview":
-            model = "gemini-3-pro-preview"
+        if model == "gemini-flash-latest":
+            model = "gemini-pro-latest"
 
     llm = _initialize_llm(model)
 
-    # Interactive Wizard Mode (if not explicitly adding all)
     if not add:
         staged = ui.interactive_staging()
         if staged:
-            # Files were staged, so we should proceed with checks
             pass
     elif add:
         stage_all_changes()
@@ -238,13 +165,10 @@ def generate_message(  # noqa: C901
         ui.print_error(str(e))
         sys.exit(1)
 
-    # Initialize Agent Pipeline
     agent_pipeline = create_commit_agent(llm)
 
-    # Optional pre-generation review
     if review:
         ui.console.print("\n[info]🔎 Reviewing staged changes...[/info]")
-        # Only prompt for confirmation when running in an interactive TTY
         try:
             is_interactive = sys.stdin.isatty()
         except Exception:
@@ -259,16 +183,14 @@ def generate_message(  # noqa: C901
 
     final_template_content = template
     if not final_template_content:
-        final_template_content = os.getenv("TEMPLATE_COMMIT") or get_commit_template()
+        final_template_content = get_template(TemplateType.COMMIT)
 
-    # Streaming Execution
     try:
         assert llm is not None
         inputs = {"diff": formatted_diff, "explanation": explanation}
         if final_template_content:
             inputs["template"] = final_template_content
 
-        # Invoke the Agent Pipeline (which now returns a generator)
         stream_gen = agent_pipeline.stream(inputs)
         commit_message = ui.stream_response(stream_gen)
 
@@ -283,19 +205,140 @@ def generate_message(  # noqa: C901
 @click.argument("template_content", nargs=-1, type=click.UNPROCESSED)
 def create_template_command(template_content: Tuple[str, ...]) -> None:
     """Saves a repository-specific commit template."""
-    from commitai.ui import RichUI
-
     ui = RichUI()
 
     content = " ".join(template_content)
     if content:
-        save_commit_template(content)
+        save_template(TemplateType.COMMIT, content)
         ui.print_success("Template saved successfully.")
     else:
         ui.print_error("Please provide the template content.")
 
 
-# --- Alias Commands ---
+@cli.command(name="manage-templates")
+def manage_templates_command() -> None:
+    """Manage local repository templates for commits and PRs."""
+    import questionary
+
+    from commitai.template import delete_template, get_template, save_template
+    from commitai.types import TemplateType
+
+    ui = RichUI()
+
+    choice = questionary.select(
+        "Which template do you want to manage?",
+        choices=["Commit Template", "Pull Request Template", "Exit"],
+    ).ask()
+
+    if choice == "Exit" or not choice:
+        return
+
+    template_type = (
+        TemplateType.COMMIT if choice == "Commit Template" else TemplateType.PR
+    )
+
+    action = questionary.select(
+        f"Manage {choice}:", choices=["View", "Edit", "Delete", "Back"]
+    ).ask()
+
+    if action == "Back" or not action:
+        manage_templates_command()
+        return
+
+    if action == "View":
+        content = get_template(template_type)
+        if content:
+            ui.console.print(
+                f"\n[bold green]Current {choice}:[/bold green]\n{content}\n"
+            )
+        else:
+            ui.console.print(
+                f"\n[bold yellow]No {choice} is currently set.[/bold yellow]\n"
+            )
+
+    elif action == "Edit":
+        current_content = get_template(template_type) or ""
+        import click
+
+        new_content = click.edit(text=current_content)
+        if new_content is not None:
+            save_template(template_type, new_content.strip())
+            ui.print_success(f"{choice} updated successfully.")
+        else:
+            ui.print_error("Edit aborted.")
+
+    elif action == "Delete":
+        delete_template(template_type)
+        ui.print_success(f"{choice} deleted successfully.")
+
+
+@cli.command(name="pr")
+@click.argument("feedback", nargs=-1, type=click.UNPROCESSED)
+@click.option(
+    "--branch",
+    "-b",
+    default="main",
+    help="Target branch to compare against (default: main).",
+)
+@click.option(
+    "--model",
+    "-m",
+    default="gemini-flash-latest",
+    help="Set the engine model (default: gemini-flash-latest).",
+)
+def pr_command(
+    feedback: Tuple[str, ...],
+    branch: str,
+    model: str,
+) -> None:
+    """Generate a Pull Request description."""
+    import subprocess
+
+    from commitai.agent import create_pr_agent
+    from commitai.template import get_template
+    from commitai.types import TemplateType
+
+    ui = RichUI()
+    ui.render_header()
+
+    feedback_str = " ".join(feedback)
+    llm = _initialize_llm(model)
+
+    try:
+        # Get diff against target branch
+        diff = subprocess.check_output(["git", "diff", f"{branch}...HEAD"]).decode(
+            "utf-8"
+        )
+        if not diff:
+            ui.print_error(f"No changes found between {branch} and HEAD.")
+            sys.exit(1)
+    except subprocess.CalledProcessError:
+        ui.print_error(f"Could not compare against branch '{branch}'. Does it exist?")
+        sys.exit(1)
+
+    template = get_template(TemplateType.PR)
+
+    agent_pipeline = create_pr_agent(llm)
+
+    try:
+        assert llm is not None
+        inputs = {
+            "diff": diff,
+            "feedback": feedback_str,
+            "branch": branch,
+            "template": template,
+        }
+
+        stream_gen = agent_pipeline.stream(inputs)
+        pr_description = ui.stream_response(stream_gen)
+
+        # Output logic
+        ui.console.print("\n[bold green]Final PR Description:[/bold green]\n")
+        ui.console.print(pr_description)
+
+    except Exception as e:
+        ui.print_error(f"Error during AI generation: {e}")
+        sys.exit(1)
 
 
 @click.command(
@@ -324,14 +367,14 @@ def create_template_command(template_content: Tuple[str, ...]) -> None:
 @click.option(
     "--model",
     "-m",
-    default="gemini-3-flash-preview",
+    default="gemini-flash-latest",
     help="Set the engine model to be used.",
 )
 @click.option(
     "--deep",
     "-d",
     is_flag=True,
-    help="Use the deeper reasoning model (gemini-3-pro-preview).",
+    help="Use the deeper reasoning model (gemini-pro-latest).",
 )
 @click.pass_context
 def commitai_alias(

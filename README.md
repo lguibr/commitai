@@ -128,7 +128,7 @@ CommitAi requires API keys for the AI provider you intend to use. Set these as e
     export GOOGLE_API_KEY="your_google_api_key_here"
     ```
 
-You only need to set the key for the provider corresponding to the model you select (or the default, Gemini 3 Flash with Google).
+You only need to set the key for the provider corresponding to the model you select (or the default, Gemini Flash Latest with Google).
 
 ### Ollama
 
@@ -203,10 +203,10 @@ The `commitai` command (which is an alias for `commitai generate`) accepts the f
 *   `-m <model_name>`, `--model <model_name>`:
     *   Specifies which AI model to use.
     *   Specifies which AI model to use.
-    *   Defaults to `gemini-3-flash-preview`.
+    *   Defaults to `gemini-flash-latest`.
     *   Ensure the corresponding API key environment variable is set.
     *   Examples:
-        *   `commitai -m gemini-3-pro-preview "Use Google's Gemini 3 Pro"`
+        *   `commitai -m gemini-pro-latest "Use Google's Gemini Pro Latest"`
         *   `commitai -m gpt-4 "Use OpenAI's GPT-4"`
         *   `commitai -m claude-3-opus "Use Anthropic's Claude 3 Opus"`
 

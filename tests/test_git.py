@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
 from commitai.git import (
     create_commit,
-    get_commit_template,
     get_current_branch_name,
     get_repository_name,
     get_staged_changes_diff,
     run_pre_commit_hook,
-    save_commit_template,
     stage_all_changes,
 )
 
@@ -61,46 +59,6 @@ def test_create_commit():
         )
 
 
-def test_get_commit_template(tmpdir):
-    repo_path = tmpdir.mkdir("repo")
-    git_path = repo_path.mkdir(".git")
-    template_path = git_path.join("commit_template.txt")
-    template_path.write("Test template")
-
-    with (
-        patch("commitai.git.get_repository_name") as mock_get_repo_name,
-        patch(
-            "builtins.open",
-            mock_open(read_data="Test template"),
-            create=True,
-        ),
-    ):
-        mock_get_repo_name.return_value = str(repo_path)
-        assert get_commit_template() == "Test template"
-
-    with (
-        patch("os.getenv") as mock_getenv,
-        patch(
-            "builtins.open",
-            mock_open(read_data="Global template"),
-            create=True,
-        ),
-    ):
-        mock_getenv.return_value = "Global template"
-        assert get_commit_template() == "Global template"
-
-
-def test_save_commit_template(tmpdir):
-    repo_path = tmpdir.mkdir("repo")
-    git_path = repo_path.mkdir(".git")
-
-    with patch("commitai.git.get_repository_name") as mock_get_repo_name:
-        mock_get_repo_name.return_value = str(repo_path)
-        save_commit_template("Test template")
-        template_path = git_path.join("commit_template.txt")
-        assert template_path.read() == "Test template"
-
-
 def test_run_pre_commit_hook(tmpdir):
     repo_path = tmpdir.mkdir("repo")
     git_path = repo_path.mkdir(".git")
@@ -109,11 +67,11 @@ def test_run_pre_commit_hook(tmpdir):
     pre_commit_path.write("#!/bin/sh\nexit 0")
     pre_commit_path.chmod(0o755)
 
-    with patch("commitai.git.get_repository_name") as mock_get_repo_name:
+    with patch("commitai.git.core.get_repository_name") as mock_get_repo_name:
         mock_get_repo_name.return_value = str(repo_path)
         assert run_pre_commit_hook() is True
 
     pre_commit_path.write("#!/bin/sh\nexit 1")
-    with patch("commitai.git.get_repository_name") as mock_get_repo_name:
+    with patch("commitai.git.core.get_repository_name") as mock_get_repo_name:
         mock_get_repo_name.return_value = str(repo_path)
         assert run_pre_commit_hook() is False

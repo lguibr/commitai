@@ -11,6 +11,7 @@ from langchain_google_genai import (
 )
 
 from commitai.cli import cli
+from commitai.types import TemplateType
 
 
 # Fixture to mock external dependencies for generate_message
@@ -25,34 +26,35 @@ def mock_generate_deps(tmp_path):
 
     with (
         patch(
-            "commitai.cli.ChatGoogleGenerativeAI",
+            "commitai.cli.config.ChatGoogleGenerativeAI",
             spec=ActualChatGoogleGenerativeAI,
             create=True,
         ) as mock_google_class_in_cli,
-        patch("commitai.cli.stage_all_changes") as mock_stage,
-        patch("commitai.cli.run_pre_commit_hook", return_value=True) as mock_hook,
+        patch("commitai.cli.main.stage_all_changes") as mock_stage,
+        patch("commitai.cli.main.run_pre_commit_hook", return_value=True) as mock_hook,
         patch(
-            "commitai.cli.get_staged_changes_diff", return_value="Staged changes diff"
+            "commitai.cli.main.get_staged_changes_diff",
+            return_value="Staged changes diff",
         ) as mock_diff,
         patch(
-            "commitai.cli.get_repository_name", return_value=str(fake_repo_path)
+            "commitai.cli.main.get_repository_name", return_value=str(fake_repo_path)
         ) as mock_repo,
         patch(
-            "commitai.cli.get_current_branch_name", return_value="main"
+            "commitai.cli.main.get_current_branch_name", return_value="main"
         ) as mock_branch,
-        patch("commitai.cli.create_commit") as mock_commit,
+        patch("commitai.cli.main.create_commit") as mock_commit,
         # Update mock target for agent creation
-        patch("commitai.cli.create_commit_agent") as mock_create_agent,
+        patch("commitai.cli.main.create_commit_agent") as mock_create_agent,
         patch("click.edit") as mock_edit,
         patch("click.clear"),
         patch(
-            "commitai.cli._get_google_api_key", return_value="fake_google_key"
+            "commitai.cli.config._get_google_api_key", return_value="fake_google_key"
         ) as mock_get_google_key,
         patch("os.getenv") as mock_getenv,
         patch("os.makedirs") as mock_makedirs,
         mock_file_open_patch as mock_builtin_open,
         patch("os.path.exists") as mock_path_exists,
-        patch("commitai.ui.RichUI") as mock_ui_class,
+        patch("commitai.cli.main.RichUI") as mock_ui_class,
     ):  # Mock os.path.exists
         mock_path_exists.return_value = False
 
@@ -113,7 +115,7 @@ def mock_generate_deps(tmp_path):
 
 
 def test_generate_default_gemini(mock_generate_deps):
-    """Test the generate command defaults to gemini-3-flash-preview."""
+    """Test the generate command defaults to gemini-flash-latest."""
     runner = CliRunner()
     mock_generate_deps[
         "file_open"
@@ -127,7 +129,7 @@ def test_generate_default_gemini(mock_generate_deps):
 
     # Check that Flash was initialized
     mock_generate_deps["google_class"].assert_called_with(
-        model="gemini-3-flash-preview",
+        model="gemini-flash-latest",
         google_api_key="fake_google_key",
         streaming=True,
     )
@@ -137,7 +139,7 @@ def test_generate_default_gemini(mock_generate_deps):
 
 
 def test_generate_deep_flag(mock_generate_deps):
-    """Test the --deep flag upgrades to gemini-3-pro-preview."""
+    """Test the --deep flag upgrades to gemini-pro-latest."""
     runner = CliRunner()
     mock_generate_deps[
         "file_open"
@@ -151,7 +153,7 @@ def test_generate_deep_flag(mock_generate_deps):
 
     # Check that Pro was initialized
     mock_generate_deps["google_class"].assert_called_with(
-        model="gemini-3-pro-preview",
+        model="gemini-pro-latest",
         google_api_key="fake_google_key",
         streaming=True,
     )
@@ -308,8 +310,8 @@ def test_generate_with_global_template(mock_generate_deps):
     mock_generate_deps["commit"].assert_called_once()
 
 
-# Patch get_commit_template directly for this test
-@patch("commitai.cli.get_commit_template")
+# Patch get_template directly for this test
+@patch("commitai.cli.main.get_template")
 def test_generate_with_local_template(mock_get_template, mock_generate_deps):
     """Test generate command local template file by mocking get_commit_template."""
     runner = CliRunner()
@@ -431,7 +433,7 @@ def test_generate_write_error_io(mock_generate_deps):
     mock_generate_deps["commit"].assert_not_called()
 
 
-@patch("commitai.cli.ChatGoogleGenerativeAI", None)
+@patch("commitai.cli.config.ChatGoogleGenerativeAI", None)
 def test_generate_google_module_not_installed(mock_generate_deps):
     """Test generate command error when google module not installed."""
     runner = CliRunner()
@@ -476,13 +478,15 @@ def test_generate_makedirs_error(mock_generate_deps):
 def test_create_template_command():
     """Test the create-template command."""
     runner = CliRunner()
-    with patch("commitai.cli.save_commit_template") as mock_save_template:
+    with patch("commitai.cli.main.save_template") as mock_save_template:
         # We need to patch the UI locally inside the command if imported there
-        with patch("commitai.ui.RichUI") as mock_ui_class:
+        with patch("commitai.cli.main.RichUI") as mock_ui_class:
             result = runner.invoke(cli, ["create-template", "Test template content"])
             assert result.exit_code == 0
 
-            mock_save_template.assert_called_once_with("Test template content")
+            mock_save_template.assert_called_once_with(
+                TemplateType.COMMIT, "Test template content"
+            )
             mock_ui_class.return_value.print_success.assert_called_with(
                 "Template saved successfully."
             )
@@ -491,8 +495,8 @@ def test_create_template_command():
 def test_create_template_command_no_content():
     """Test the create-template command with no content."""
     runner = CliRunner()
-    with patch("commitai.cli.save_commit_template") as mock_save_template:
-        with patch("commitai.ui.RichUI") as mock_ui_class:
+    with patch("commitai.cli.main.save_template") as mock_save_template:
+        with patch("commitai.cli.main.RichUI") as mock_ui_class:
             result = runner.invoke(cli, ["create-template"])
             assert result.exit_code == 0
             mock_save_template.assert_not_called()

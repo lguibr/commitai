@@ -1,50 +1,17 @@
-# File: commitai/ui.py
 from typing import Generator
 
 import questionary
-from rich.console import Console
+from rich.console import Group
 from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.spinner import Spinner
 from rich.text import Text
-from rich.theme import Theme
 
-from commitai.git import get_unstaged_files, stage_file
+from commitai.git.core import get_unstaged_files, stage_file
 
-# Custom theme for "State of the Art" look
-theme = Theme(
-    {
-        "info": "cyan",
-        "warning": "yellow",
-        "error": "bold red",
-        "success": "bold green",
-        "header": "bold magenta",
-        "token": "white",
-    }
-)
-
-console = Console(theme=theme)
-
-ASCII_ART = r"""
- ....                        ++*++                       :::::
-..............              ++++++              -:::::::-:- :::
-.............:..              +**              ==--::-  :::::::
-  ...       :...           =++++++=            ---
-            ....      ***+++++++++++++++       ::-
-             ...     ***+++****++++++++++*     ::-
-             ...     ***+++****+++++++++++     :::       -----
-             ...::::-+**++   **+++  ++++++=---=:----------- ---
-               ...-:-+**+++++**++++++++++++-::==---------------
-              ...    ***++++++*+++++++*++* :::- -------  -----
-             ::::     ####***********###*  ----  ------
-  .....      ...        ###**####****##   -----:  ---    -----
-.........   ...               +++        :::::::: ---- ---------
-...   .....:..       ++++++++**+        :::-   ::-  ------   ---
-..........            +**+++            -:::::::::     ---------
- .......                                  -:::::         ------
-"""
+from .theme import ASCII_ART, console
 
 
 class RichUI:
@@ -54,8 +21,6 @@ class RichUI:
     def render_header(self):
         """Renders the persistent header with ASCII art."""
         self.console.clear()
-        # Center and colorize the art
-        # Center and colorize the art
         self.console.print(Text(ASCII_ART, style="header"))
         self.console.print()
 
@@ -69,7 +34,6 @@ class RichUI:
             return False
 
         choices = [questionary.Choice(f, checked=False) for f in unstaged]
-        # Add "Select All" option at the end as requested
         SELECT_ALL_OPTION = ">> Select All <<"
         choices.append(questionary.Choice(SELECT_ALL_OPTION, checked=False))
 
@@ -97,7 +61,6 @@ class RichUI:
         ).ask()
 
         if selected_files:
-            # Handle "Select All" logic
             if SELECT_ALL_OPTION in selected_files:
                 selected_files = unstaged
 
@@ -115,16 +78,12 @@ class RichUI:
         """
         Handles the streaming of the agent response with distinct UI boxes.
         """
-        from rich.console import Group
-
         tool_log: list[str] = []
         message_content = ""
         current_thought = "Initializing..."
 
         def generate_layout():
             items = []
-
-            # 1. Thinking Box (Spinner + Current Status)
             items.append(
                 Panel(
                     Spinner("dots", text=f" {current_thought}"),
@@ -134,9 +93,7 @@ class RichUI:
                 )
             )
 
-            # 2. Tools Box (Only if tools have been used)
             if tool_log:
-                # Show tool events (User requested "tools used" box)
                 items.append(
                     Panel(
                         "\n".join(tool_log),
@@ -145,7 +102,6 @@ class RichUI:
                     )
                 )
 
-            # 3. Message Box (Only if content exists)
             if message_content:
                 items.append(
                     Panel(
@@ -157,7 +113,6 @@ class RichUI:
 
             return Group(*items)
 
-        # Use Live display
         with Live(
             console=self.console, refresh_per_second=10, vertical_overflow="visible"
         ) as live:
@@ -172,7 +127,7 @@ class RichUI:
 
                 elif etype in ("tool_use", "tool_output"):
                     tool_log.append(content)
-                    current_thought = "Executing tools..."  # Update status too
+                    current_thought = "Executing tools..."
 
                 elif etype == "token":
                     if isinstance(content, list):
@@ -182,7 +137,6 @@ class RichUI:
 
                 elif etype == "error":
                     current_thought = f"[red]Error: {content}[/red]"
-                    # Ensure we don't lose the error visibility
 
                 live.update(generate_layout())
 

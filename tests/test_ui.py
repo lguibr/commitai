@@ -8,7 +8,7 @@ from commitai.ui import RichUI
 # Fixture for RichUI with mocked console
 @pytest.fixture
 def mock_ui():
-    with patch("commitai.ui.console") as mock_console:
+    with patch("commitai.ui.core.console") as mock_console:
         ui = RichUI()
         ui.console = mock_console
         yield ui
@@ -41,20 +41,20 @@ def test_render_header_no_art(mock_ui):
 
 def test_interactive_staging_no_files(mock_ui):
     """Test interactive staging when no unstaged files exist."""
-    with patch("commitai.ui.get_unstaged_files", return_value=[]):
+    with patch("commitai.ui.core.get_unstaged_files", return_value=[]):
         result = mock_ui.interactive_staging()
         assert result is False
         mock_ui.console.print.assert_not_called()
 
 
-@patch("commitai.ui.get_unstaged_files", return_value=["file1.py", "file2.py"])
-@patch("commitai.ui.questionary.checkbox")
+@patch("commitai.ui.core.get_unstaged_files", return_value=["file1.py", "file2.py"])
+@patch("commitai.ui.core.questionary.checkbox")
 def test_interactive_staging_selection(mock_checkbox, mock_get_files, mock_ui):
     """Test interactive staging with user selection."""
     # Mock user selecting one file
     mock_checkbox.return_value.ask.return_value = ["file1.py"]
 
-    with patch("commitai.ui.stage_file") as mock_stage:
+    with patch("commitai.ui.core.stage_file") as mock_stage:
         result = mock_ui.interactive_staging()
 
         assert result is True
@@ -62,13 +62,13 @@ def test_interactive_staging_selection(mock_checkbox, mock_get_files, mock_ui):
         mock_ui.console.print.assert_called()  # Should print success
 
 
-@patch("commitai.ui.get_unstaged_files", return_value=["file1.py"])
-@patch("commitai.ui.questionary.checkbox")
+@patch("commitai.ui.core.get_unstaged_files", return_value=["file1.py"])
+@patch("commitai.ui.core.questionary.checkbox")
 def test_interactive_staging_cancel(mock_checkbox, mock_get_files, mock_ui):
     """Test interactive staging when user cancels or selects nothing."""
     mock_checkbox.return_value.ask.return_value = []
 
-    with patch("commitai.ui.stage_file") as mock_stage:
+    with patch("commitai.ui.core.stage_file") as mock_stage:
         result = mock_ui.interactive_staging()
 
         assert result is False
@@ -85,7 +85,7 @@ def test_stream_response(mock_ui):
     ]
 
     # We need to mock Live because it's a context manager
-    with patch("commitai.ui.Live") as mock_live_cls:
+    with patch("commitai.ui.core.Live") as mock_live_cls:
         mock_live_instance = mock_live_cls.return_value.__enter__.return_value
 
         final_content = mock_ui.stream_response(iter(events))
@@ -97,7 +97,7 @@ def test_stream_response(mock_ui):
 
 def test_confirm_action(mock_ui):
     """Test confirmation dialog."""
-    with patch("commitai.ui.Confirm.ask", return_value=True) as mock_ask:
+    with patch("commitai.ui.core.Confirm.ask", return_value=True) as mock_ask:
         assert mock_ui.confirm_action("Do it?") is True
         mock_ask.assert_called_once()
 
